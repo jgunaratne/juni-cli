@@ -57,12 +57,12 @@ const GeminiChat = forwardRef(function GeminiChat({ model = 'gemini-3-flash-prev
     onStatusChange('ready');
   }, [onStatusChange]);
 
-  // Auto-scroll
+  // Auto-scroll only when user is typing
   useEffect(() => {
-    if (scrollRef.current) {
+    if (input && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, isLoading]);
+  }, [input]);
 
   // Focus input when tab becomes active
   useEffect(() => {
