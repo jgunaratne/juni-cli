@@ -1,0 +1,16 @@
+{
+  "name": "juni-cli-server",
+  "version": "1.0.0",
+  "description": "Express backend for web-based SSH client",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "npx -y nodemon index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1",
+    "ssh2": "^1.16.0"
+  }
+}
