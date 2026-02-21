@@ -4,7 +4,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { io } from 'socket.io-client';
 import '@xterm/xterm/css/xterm.css';
 
-const SERVER_URL = 'http://localhost:3001';
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || window.location.origin;
 
 export default function Terminal({ connection, onStatusChange, onDisconnect }) {
   const termRef = useRef(null);
