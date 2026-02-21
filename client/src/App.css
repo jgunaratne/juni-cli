@@ -40,6 +40,54 @@
   -webkit-text-fill-color: transparent;
 }
 
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.split-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.split-toggle:hover {
+  color: var(--text-secondary);
+  border-color: rgba(88, 166, 255, 0.3);
+  background: rgba(88, 166, 255, 0.06);
+}
+
+.split-toggle--active {
+  color: var(--accent);
+  border-color: rgba(88, 166, 255, 0.4);
+  background: rgba(88, 166, 255, 0.1);
+}
+
+.split-toggle--active:hover {
+  border-color: rgba(88, 166, 255, 0.5);
+  background: rgba(88, 166, 255, 0.15);
+}
+
+.split-toggle-icon {
+  font-size: 14px;
+  transition: transform 0.2s;
+}
+
+.split-toggle--active .split-toggle-icon {
+  transform: rotate(90deg);
+}
 .status-bar {
   display: flex;
   align-items: center;
@@ -241,6 +289,47 @@
   overflow: hidden;
 }
 
+.app-main--split {
+  flex-direction: row;
+}
+
+/* ─── Split panels ────────────────────────────────────────── */
+
+.split-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.split-panel--full {
+  flex: 1;
+}
+
+.app-main--split .split-panel--left {
+  flex: 1;
+  min-width: 0;
+}
+
+.app-main--split .split-panel--right {
+  flex: 1;
+  min-width: 0;
+}
+
+.split-divider {
+  width: 1px;
+  background: var(--border);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.split-divider::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 5px;
+  margin-left: -2px;
+  cursor: col-resize;
+}
 /* ─── Connection Form ─────────────────────────────────────── */
 .connection-form-wrapper {
   flex: 1;
@@ -577,6 +666,7 @@
   line-height: 1.5;
   color: #c9d1d9;
   cursor: text;
+  user-select: text;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
 }

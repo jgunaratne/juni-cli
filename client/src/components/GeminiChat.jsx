@@ -177,7 +177,16 @@ export default function GeminiChat({ isActive, onStatusChange }) {
         </button>
       </div>
 
-      <div className="gemini-terminal" ref={scrollRef} onClick={() => inputRef.current?.focus()}>
+      <div
+        className="gemini-terminal"
+        ref={scrollRef}
+        onClick={() => {
+          const selection = window.getSelection();
+          if (!selection || selection.isCollapsed) {
+            inputRef.current?.focus();
+          }
+        }}
+      >
         {/* Welcome banner */}
         {messages.length === 0 && !isLoading && (
           <div className="gemini-term-welcome">

@@ -1,15 +1,18 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import ConnectionForm from './components/ConnectionForm';
 import Terminal from './components/Terminal';
 import GeminiChat from './components/GeminiChat';
 import './App.css';
 
 let nextId = 1;
+const SPLIT_GEMINI_ID = '__split_gemini__';
 
 function App() {
   const [tabs, setTabs] = useState([]);           // { id, type, connection?, status }
   const [activeTab, setActiveTab] = useState(null); // id or null
   const [showForm, setShowForm] = useState(true);
+  const [splitMode, setSplitMode] = useState(false);
+  const [splitGeminiStatus, setSplitGeminiStatus] = useState('connecting');
 
   const handleConnect = useCallback((credentials) => {
     const id = nextId++;
@@ -62,15 +65,13 @@ function App() {
     setShowForm(false);
   }, []);
 
-  // Label for a tab
+  const toggleSplit = useCallback(() => {
+    setSplitMode((prev) => !prev);
+  }, []);
+
   const getTabLabel = (tab) => {
     if (tab.type === 'gemini') return 'Gemini';
     return `${tab.connection.username}@${tab.connection.host}`;
-  };
-
-  const getTabIcon = (tab) => {
-    if (tab.type === 'gemini') return '✦';
-    return null; // uses status dot for SSH
   };
 
   // Determine status to display in header
@@ -81,6 +82,9 @@ function App() {
       : 'disconnected'
     : activeSession?.status || 'disconnected';
 
+  // In split mode, show active tab on left and a dedicated Gemini on right
+  const activeIsGeminiTab = activeSession?.type === 'gemini';
+
   return (
     <div className="app">
       <header className="app-header">
@@ -88,9 +92,19 @@ function App() {
           <span className="logo-icon">⬡</span>
           <h1>juni-cli</h1>
         </div>
-        <div className="status-bar">
-          <span className={`status-dot ${activeSession?.status || ''}`} />
-          <span className="status-text">{displayStatus}</span>
+        <div className="header-right">
+          <button
+            className={`split-toggle ${splitMode ? 'split-toggle--active' : ''}`}
+            onClick={toggleSplit}
+            title={splitMode ? 'Exit split screen' : 'Split screen: Terminal + Gemini'}
+          >
+            <span className="split-toggle-icon">⬡</span>
+            {splitMode ? 'Exit Split' : 'Split'}
+          </button>
+          <div className="status-bar">
+            <span className={`status-dot ${activeSession?.status || ''}`} />
+            <span className="status-text">{displayStatus}</span>
+          </div>
         </div>
       </header>
 
@@ -141,27 +155,48 @@ function App() {
       )}
 
       {/* ── Content ─────────────────────────────────────── */}
-      <main className="app-main">
-        {showForm && <ConnectionForm onConnect={handleConnect} />}
+      <main className={`app-main ${splitMode ? 'app-main--split' : ''}`}>
+        {/* Left panel (or full panel when not split) */}
+        <div className={`split-panel split-panel--left ${splitMode ? '' : 'split-panel--full'}`}>
+          {showForm && <ConnectionForm onConnect={handleConnect} />}
 
-        {tabs.map((tab) =>
-          tab.type === 'ssh' ? (
-            <Terminal
-              key={tab.id}
-              tabId={tab.id}
-              connection={tab.connection}
-              isActive={tab.id === activeTab && !showForm}
-              onStatusChange={(status) => handleStatusChange(tab.id, status)}
-              onClose={() => handleCloseTab(tab.id)}
-            />
-          ) : (
-            <GeminiChat
-              key={tab.id}
-              isActive={tab.id === activeTab && !showForm}
-              onStatusChange={(status) => handleStatusChange(tab.id, status)}
-              onClose={() => handleCloseTab(tab.id)}
-            />
-          ),
+          {tabs.map((tab) =>
+            tab.type === 'ssh' ? (
+              <Terminal
+                key={tab.id}
+                tabId={tab.id}
+                connection={tab.connection}
+                isActive={tab.id === activeTab && !showForm}
+                onStatusChange={(status) => handleStatusChange(tab.id, status)}
+                onClose={() => handleCloseTab(tab.id)}
+              />
+            ) : (
+                /* In split mode, hide Gemini tabs from the left panel */
+                !splitMode && (
+                  <GeminiChat
+                    key={tab.id}
+                    isActive={tab.id === activeTab && !showForm}
+                    onStatusChange={(status) => handleStatusChange(tab.id, status)}
+                    onClose={() => handleCloseTab(tab.id)}
+                  />
+                )
+            ),
+          )}
+        </div>
+
+        {/* Right panel — Gemini (only in split mode) */}
+        {splitMode && (
+          <>
+            <div className="split-divider" />
+            <div className="split-panel split-panel--right">
+              <GeminiChat
+                key={SPLIT_GEMINI_ID}
+                isActive={true}
+                onStatusChange={(status) => setSplitGeminiStatus(status)}
+                onClose={() => setSplitMode(false)}
+              />
+            </div>
+          </>
         )}
       </main>
     </div>
