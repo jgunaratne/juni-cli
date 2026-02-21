@@ -229,20 +229,25 @@ export default function GeminiChat({ isActive, onStatusChange }) {
 
         {/* Input line */}
         {!isLoading && (
-          <div className="gemini-term-input-line">
+          <div
+            className="gemini-term-input-line"
+            onClick={() => inputRef.current?.focus()}
+          >
             <span className="gemini-term-prompt-symbol">❯</span>
-            <input
-              ref={inputRef}
-              className="gemini-term-input"
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder=""
-              autoComplete="off"
-              spellCheck="false"
-            />
-            <span className="gemini-term-cursor" />
+            <div className="gemini-term-input-wrapper">
+              <span className="gemini-term-input-display">{input}</span>
+              <span className="gemini-term-cursor" />
+              <input
+                ref={inputRef}
+                className="gemini-term-input"
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                autoComplete="off"
+                spellCheck="false"
+              />
+            </div>
           </div>
         )}
       </div>

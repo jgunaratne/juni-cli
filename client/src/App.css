@@ -747,23 +747,32 @@
   align-items: center;
   margin-top: 12px;
   padding-top: 4px;
+  cursor: text;
 }
 
-.gemini-term-input {
+.gemini-term-input-wrapper {
   flex: 1;
-  background: transparent;
-  border: none;
-  outline: none;
+  position: relative;
+    display: flex;
+    align-items: center;
+    min-height: 21px;
+  }
+  
+  .gemini-term-input-display {
   color: #f0f6fc;
   font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
   font-size: 14px;
   line-height: 1.5;
-  caret-color: transparent;
+  white-space: pre;
 }
 
-.gemini-term-input::placeholder {
-  color: var(--text-muted);
-  font-weight: 400;
+.gemini-term-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  font-size: 14px;
+  border: none;
+  background: none;
 }
 
 /* ── Blinking block cursor ──────────────────────── */
