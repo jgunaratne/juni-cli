@@ -56,7 +56,7 @@ app.get('/api/health', (_req, res) => {
 app.post('/api/gemini/chat', async (req, res) => {
   try {
     const {
-      model = 'gemini-2.5-flash',
+      model = 'gemini-3-flash-preview',
       messages = [],
       project,
       location,

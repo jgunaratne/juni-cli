@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import ConnectionForm from './components/ConnectionForm';
 import Terminal from './components/Terminal';
 import GeminiChat from './components/GeminiChat';
@@ -7,12 +7,46 @@ import './App.css';
 let nextId = 1;
 const SPLIT_GEMINI_ID = '__split_gemini__';
 
+const GEMINI_MODELS = [
+  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+  { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash' },
+];
+
 function App() {
   const [tabs, setTabs] = useState([]);           // { id, type, connection?, status }
   const [activeTab, setActiveTab] = useState(null); // id or null
   const [showForm, setShowForm] = useState(true);
   const [splitMode, setSplitMode] = useState(false);
   const [splitGeminiStatus, setSplitGeminiStatus] = useState('connecting');
+  const [splitFocus, setSplitFocus] = useState('left'); // 'left' or 'right'
+  const [selectedModel, setSelectedModel] = useState('gemini-3-flash-preview');
+
+  const terminalRefs = useRef({});
+  const splitGeminiRef = useRef(null);
+
+  // Shift+Tab to toggle focus between split panels
+  useEffect(() => {
+    if (!splitMode) return;
+
+    const handleKeyDown = (e) => {
+      if (e.shiftKey && e.key === 'Tab') {
+        e.preventDefault();
+        e.stopPropagation();
+        setSplitFocus((prev) => {
+          const next = prev === 'left' ? 'right' : 'left';
+          if (next === 'right') {
+            splitGeminiRef.current?.focus();
+          } else if (activeTab && terminalRefs.current[activeTab]) {
+            terminalRefs.current[activeTab].focus();
+          }
+          return next;
+        });
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [splitMode, activeTab]);
 
   const handleConnect = useCallback((credentials) => {
     const id = nextId++;
@@ -69,6 +103,26 @@ function App() {
     setSplitMode((prev) => !prev);
   }, []);
 
+  const sendToGemini = useCallback(() => {
+    if (!splitMode || !activeTab) return;
+    const termRef = terminalRefs.current[activeTab];
+    if (!termRef) return;
+    const text = termRef.getBufferText();
+    if (!text.trim()) return;
+    splitGeminiRef.current?.pasteText(text);
+  }, [splitMode, activeTab]);
+
+  const sendToTerminal = useCallback(() => {
+    if (!splitMode || !activeTab) return;
+    const selection = window.getSelection();
+    const text = selection?.toString() ?? '';
+    if (!text.trim()) return;
+    const termRef = terminalRefs.current[activeTab];
+    if (!termRef) return;
+    termRef.writeToTerminal(text);
+    termRef.focus();
+  }, [splitMode, activeTab]);
+
   const getTabLabel = (tab) => {
     if (tab.type === 'gemini') return 'Gemini';
     return `${tab.connection.username}@${tab.connection.host}`;
@@ -101,6 +155,36 @@ function App() {
             <span className="split-toggle-icon">⬡</span>
             {splitMode ? 'Exit Split' : 'Split'}
           </button>
+          {splitMode && activeSession?.type === 'ssh' && (
+            <>
+              <button
+                className="split-toggle split-toggle--send"
+                onClick={sendToGemini}
+                title="Copy terminal output to Gemini input"
+              >
+                <span className="split-toggle-icon">→✦</span>
+                Send to Gemini
+              </button>
+              <button
+                className="split-toggle split-toggle--send"
+                onClick={sendToTerminal}
+                title="Paste highlighted Gemini text into terminal"
+              >
+                <span className="split-toggle-icon">✦→</span>
+                Send to Terminal
+              </button>
+            </>
+          )}
+          <select
+            className="model-selector"
+            value={selectedModel}
+            onChange={(e) => setSelectedModel(e.target.value)}
+            title="Select Gemini model"
+          >
+            {GEMINI_MODELS.map((m) => (
+              <option key={m.id} value={m.id}>{m.label}</option>
+            ))}
+          </select>
           <div className="status-bar">
             <span className={`status-dot ${activeSession?.status || ''}`} />
             <span className="status-text">{displayStatus}</span>
@@ -164,6 +248,10 @@ function App() {
             tab.type === 'ssh' ? (
               <Terminal
                 key={tab.id}
+                ref={(el) => {
+                  if (el) terminalRefs.current[tab.id] = el;
+                  else delete terminalRefs.current[tab.id];
+                }}
                 tabId={tab.id}
                 connection={tab.connection}
                 isActive={tab.id === activeTab && !showForm}
@@ -175,6 +263,7 @@ function App() {
                 !splitMode && (
                   <GeminiChat
                     key={tab.id}
+                    model={selectedModel}
                     isActive={tab.id === activeTab && !showForm}
                     onStatusChange={(status) => handleStatusChange(tab.id, status)}
                     onClose={() => handleCloseTab(tab.id)}
@@ -191,6 +280,8 @@ function App() {
             <div className="split-panel split-panel--right">
               <GeminiChat
                 key={SPLIT_GEMINI_ID}
+                ref={splitGeminiRef}
+                model={selectedModel}
                 isActive={true}
                 onStatusChange={(status) => setSplitGeminiStatus(status)}
                 onClose={() => setSplitMode(false)}

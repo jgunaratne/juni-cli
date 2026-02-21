@@ -1,14 +1,14 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || window.location.origin;
 
 /* ── API helpers ─────────────────────────────────────── */
 
-async function callGemini(messages) {
+async function callGemini(model, messages) {
   const res = await fetch(`${SERVER_URL}/api/gemini/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: 'gemini-2.5-flash', messages }),
+    body: JSON.stringify({ model, messages }),
   });
 
   if (!res.ok) {
@@ -35,7 +35,15 @@ function renderForTerminal(text) {
 
 /* ── Component ────────────────────────────────────────── */
 
-export default function GeminiChat({ isActive, onStatusChange }) {
+const GeminiChat = forwardRef(function GeminiChat({ model = 'gemini-3-flash-preview', isActive, onStatusChange }, ref) {
+  useImperativeHandle(ref, () => ({
+    focus: () => inputRef.current?.focus(),
+    pasteText: (text) => {
+      setInput(text);
+      requestAnimationFrame(() => inputRef.current?.focus());
+    },
+  }));
+
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -91,7 +99,7 @@ export default function GeminiChat({ isActive, onStatusChange }) {
     if (text === 'model') {
       setMessages((prev) => [
         ...prev,
-        { type: 'system', text: 'Model: gemini-2.5-flash (via Vertex AI)' },
+        { type: 'system', text: `Model: ${model} (via Vertex AI)` },
       ]);
       setInput('');
       return;
@@ -112,7 +120,7 @@ export default function GeminiChat({ isActive, onStatusChange }) {
         .filter((m) => m.type === 'user' || m.type === 'model')
         .map((m) => ({ role: m.type === 'user' ? 'user' : 'model', text: m.text }));
 
-      const reply = await callGemini(apiMessages);
+      const reply = await callGemini(model, apiMessages);
       setMessages((prev) => [...prev, { type: 'model', text: renderForTerminal(reply) }]);
     } catch (err) {
       setMessages((prev) => [
@@ -123,7 +131,7 @@ export default function GeminiChat({ isActive, onStatusChange }) {
       setIsLoading(false);
       inputRef.current?.focus();
     }
-  }, [input, isLoading, messages]);
+  }, [input, isLoading, messages, model]);
 
   const handleKeyDown = useCallback(
     (e) => {
@@ -199,7 +207,7 @@ export default function GeminiChat({ isActive, onStatusChange }) {
   ╚═════╝ ╚══════╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝`}
             </div>
             <div className="gemini-term-info">
-              <span className="gemini-term-label">Gemini 2.5 Flash</span> via Vertex AI
+              <span className="gemini-term-label">{model}</span> via Vertex AI
             </div>
             <div className="gemini-term-hint">
               Type a message to chat, or <span className="gemini-term-cmd">help</span> for commands.
@@ -262,4 +270,6 @@ export default function GeminiChat({ isActive, onStatusChange }) {
       </div>
     </div>
   );
-}
+});
+
+export default GeminiChat;

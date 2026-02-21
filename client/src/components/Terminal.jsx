@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { io } from 'socket.io-client';
@@ -6,7 +6,31 @@ import '@xterm/xterm/css/xterm.css';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || window.location.origin;
 
-export default function Terminal({ tabId, connection, isActive, onStatusChange, onClose }) {
+const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onStatusChange, onClose }, ref) {
+  useImperativeHandle(ref, () => ({
+    focus: () => xtermRef.current?.focus(),
+    getBufferText: () => {
+      const term = xtermRef.current;
+      if (!term) return '';
+      const buf = term.buffer.active;
+      const lines = [];
+      for (let i = 0; i < buf.length; i++) {
+        const line = buf.getLine(i)?.translateToString(true) ?? '';
+        lines.push(line);
+      }
+      // Trim trailing empty lines
+      while (lines.length > 0 && lines[lines.length - 1].trim() === '') {
+        lines.pop();
+      }
+      return lines.join('\n');
+    },
+    writeToTerminal: (text) => {
+      if (socketRef.current) {
+        socketRef.current.emit('ssh:data', text);
+      }
+    },
+  }));
+
   const termRef = useRef(null);
   const xtermRef = useRef(null);
   const fitRef = useRef(null);
@@ -164,4 +188,6 @@ export default function Terminal({ tabId, connection, isActive, onStatusChange, 
       <div className="terminal-viewport" ref={termRef} />
     </div>
   );
-}
+});
+
+export default Terminal;
