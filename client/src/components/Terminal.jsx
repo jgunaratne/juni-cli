@@ -6,19 +6,28 @@ import '@xterm/xterm/css/xterm.css';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || window.location.origin;
 
-export default function Terminal({ connection, onStatusChange, onDisconnect }) {
+export default function Terminal({ tabId, connection, isActive, onStatusChange, onClose }) {
   const termRef = useRef(null);
   const xtermRef = useRef(null);
   const fitRef = useRef(null);
   const socketRef = useRef(null);
 
-  const disconnect = useCallback(() => {
-    if (socketRef.current) {
-      socketRef.current.disconnect();
-      socketRef.current = null;
+  // Re-fit when tab becomes active (container goes from display:none → flex)
+  useEffect(() => {
+    if (isActive && fitRef.current) {
+      // Need a small delay for the container to have layout dimensions
+      requestAnimationFrame(() => {
+        try {
+          fitRef.current.fit();
+          if (xtermRef.current) {
+            xtermRef.current.focus();
+          }
+        } catch {
+          // may throw if terminal not ready yet
+        }
+      });
     }
-    onDisconnect();
-  }, [onDisconnect]);
+  }, [isActive]);
 
   useEffect(() => {
     // ── Initialise xterm ──────────────────────────────────────
@@ -59,7 +68,6 @@ export default function Terminal({ connection, onStatusChange, onDisconnect }) {
 
     // ── Fit terminal to container via ResizeObserver ────────
     const resizeObserver = new ResizeObserver(() => {
-      // Wrap in rAF to avoid ResizeObserver loop errors
       requestAnimationFrame(() => {
         try {
           fit.fit();
@@ -69,13 +77,11 @@ export default function Terminal({ connection, onStatusChange, onDisconnect }) {
       });
     });
 
-    // Observe the container element for size changes
     resizeObserver.observe(termRef.current);
 
-    // Initial fit after a short delay to let layout settle
+    // Initial fit
     setTimeout(() => {
       fit.fit();
-      // Send initial dimensions so remote PTY starts correctly
       const { cols, rows } = term;
       if (socketRef.current) {
         socketRef.current.emit('ssh:resize', { cols, rows });
@@ -95,7 +101,6 @@ export default function Terminal({ connection, onStatusChange, onDisconnect }) {
 
     socket.on('connect', () => {
       socket.emit('ssh:connect', connection);
-      // Send dimensions once connected so PTY is sized correctly
       const { cols, rows } = term;
       socket.emit('ssh:resize', { cols, rows });
     });
@@ -132,18 +137,22 @@ export default function Terminal({ connection, onStatusChange, onDisconnect }) {
       socket.disconnect();
       term.dispose();
     };
-  }, [connection, onStatusChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
-    <div className="terminal-container">
+    <div
+      className="terminal-container"
+      style={{ display: isActive ? 'flex' : 'none' }}
+    >
       <div className="terminal-toolbar">
         <div className="toolbar-left">
           <span className="terminal-title">
-            {connection.username}@{connection.host}
+            {connection.username}@{connection.host}:{connection.port}
           </span>
         </div>
-        <button className="disconnect-btn" onClick={disconnect}>
-          ✕ Disconnect
+        <button className="disconnect-btn" onClick={onClose}>
+          ✕ Close
         </button>
       </div>
       <div className="terminal-viewport" ref={termRef} />
