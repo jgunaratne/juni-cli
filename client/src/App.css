@@ -758,10 +758,33 @@
   font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
   font-size: 14px;
   line-height: 1.5;
-  caret-color: #58a6ff;
+  caret-color: transparent;
 }
 
 .gemini-term-input::placeholder {
   color: var(--text-muted);
   font-weight: 400;
+}
+
+/* ── Blinking block cursor ──────────────────────── */
+
+.gemini-term-cursor {
+  display: inline-block;
+  width: 8.4px;
+  height: 18px;
+  background: #58a6ff;
+  vertical-align: text-bottom;
+  animation: geminiCursorBlink 1s step-end infinite;
+}
+
+@keyframes geminiCursorBlink {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0;
+  }
 }

@@ -238,10 +238,11 @@ export default function GeminiChat({ isActive, onStatusChange }) {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask Gemini anything…"
+              placeholder=""
               autoComplete="off"
               spellCheck="false"
             />
+            <span className="gemini-term-cursor" />
           </div>
         )}
       </div>
