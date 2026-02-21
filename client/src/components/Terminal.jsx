@@ -111,6 +111,12 @@ export default function Terminal({ tabId, connection, isActive, onStatusChange, 
 
     socket.on('ssh:status', ({ status }) => {
       onStatusChange(status);
+      if (status === 'ready') {
+        // Shell is now open — re-fit and send final dimensions
+        fit.fit();
+        const { cols, rows } = term;
+        socket.emit('ssh:resize', { cols, rows });
+      }
       if (status === 'disconnected') {
         term.writeln('\r\n\x1b[1;31mConnection closed.\x1b[0m');
       }

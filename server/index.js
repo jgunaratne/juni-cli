@@ -29,6 +29,7 @@ io.on('connection', (socket) => {
 
   let sshClient = null;
   let sshStream = null;
+  let pendingSize = { rows: 24, cols: 80 };
 
   // ── ssh:connect ──────────────────────────────────────────────
   socket.on('ssh:connect', (credentials) => {
@@ -41,7 +42,9 @@ io.on('connection', (socket) => {
       console.log(`[ssh] authenticated  ${username}@${host}`);
       socket.emit('ssh:status', { status: 'authenticated' });
 
-      sshClient.shell({ term: 'xterm-256color' }, (err, stream) => {
+      sshClient.shell(
+        { term: 'xterm-256color', rows: pendingSize.rows, cols: pendingSize.cols },
+        (err, stream) => {
         if (err) {
           socket.emit('ssh:error', { message: err.message });
           return;
@@ -97,6 +100,7 @@ io.on('connection', (socket) => {
 
   // ── ssh:resize ───────────────────────────────────────────────
   socket.on('ssh:resize', ({ cols, rows }) => {
+    pendingSize = { rows, cols };
     if (sshStream) sshStream.setWindow(rows, cols, 0, 0);
   });
 
