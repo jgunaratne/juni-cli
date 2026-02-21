@@ -83,12 +83,23 @@ io.on('connection', (socket) => {
     });
 
     // Build connection config
-    const connectConfig = { host, port: Number(port), username };
+    const connectConfig = {
+      host,
+      port: Number(port),
+      username,
+      tryKeyboard: true,
+      readyTimeout: 10000,
+    };
     if (privateKey) {
       connectConfig.privateKey = privateKey;
     } else if (password) {
       connectConfig.password = password;
     }
+
+    // Handle keyboard-interactive auth (used by many SSH servers)
+    sshClient.on('keyboard-interactive', (_name, _instructions, _lang, _prompts, finish) => {
+      finish([password || '']);
+    });
 
     sshClient.connect(connectConfig);
   });
