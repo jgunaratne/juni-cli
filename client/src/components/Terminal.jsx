@@ -24,7 +24,7 @@ export default function Terminal({ connection, onStatusChange, onDisconnect }) {
     // ── Initialise xterm ──────────────────────────────────────
     const term = new XTerm({
       cursorBlink: true,
-      cursorStyle: 'bar',
+      cursorStyle: 'block',
       fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Code", monospace',
       fontSize: 14,
       lineHeight: 1.35,
@@ -57,8 +57,30 @@ export default function Terminal({ connection, onStatusChange, onDisconnect }) {
     term.loadAddon(fit);
     term.open(termRef.current);
 
-    // Small delay to ensure DOM is ready for fit
-    requestAnimationFrame(() => fit.fit());
+    // ── Fit terminal to container via ResizeObserver ────────
+    const resizeObserver = new ResizeObserver(() => {
+      // Wrap in rAF to avoid ResizeObserver loop errors
+      requestAnimationFrame(() => {
+        try {
+          fit.fit();
+        } catch {
+          // terminal may be disposed during cleanup
+        }
+      });
+    });
+
+    // Observe the container element for size changes
+    resizeObserver.observe(termRef.current);
+
+    // Initial fit after a short delay to let layout settle
+    setTimeout(() => {
+      fit.fit();
+      // Send initial dimensions so remote PTY starts correctly
+      const { cols, rows } = term;
+      if (socketRef.current) {
+        socketRef.current.emit('ssh:resize', { cols, rows });
+      }
+    }, 100);
 
     xtermRef.current = term;
     fitRef.current = fit;
@@ -73,6 +95,9 @@ export default function Terminal({ connection, onStatusChange, onDisconnect }) {
 
     socket.on('connect', () => {
       socket.emit('ssh:connect', connection);
+      // Send dimensions once connected so PTY is sized correctly
+      const { cols, rows } = term;
+      socket.emit('ssh:resize', { cols, rows });
     });
 
     socket.on('ssh:output', (data) => {
@@ -96,22 +121,14 @@ export default function Terminal({ connection, onStatusChange, onDisconnect }) {
       socket.emit('ssh:data', data);
     });
 
-    // Resize handling
-    const handleResize = () => {
-      fit.fit();
-      const { cols, rows } = term;
-      socket.emit('ssh:resize', { cols, rows });
-    };
-
+    // Notify server when terminal dimensions change
     term.onResize(({ cols, rows }) => {
       socket.emit('ssh:resize', { cols, rows });
     });
 
-    window.addEventListener('resize', handleResize);
-
     // ── Cleanup ───────────────────────────────────────────────
     return () => {
-      window.removeEventListener('resize', handleResize);
+      resizeObserver.disconnect();
       socket.disconnect();
       term.dispose();
     };

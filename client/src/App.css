@@ -195,6 +195,118 @@
   box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
+/* ─── Host dropdown ──────────────────────────────────────── */
+.host-input-wrapper {
+  position: relative;
+}
+
+.host-input-wrapper input {
+  width: 100%;
+  padding-right: 36px;
+}
+
+.dropdown-toggle {
+  position: absolute;
+  right: 1px;
+  top: 1px;
+  bottom: 1px;
+  width: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-left: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  transition: color 0.2s, background 0.2s;
+}
+
+.dropdown-toggle:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.host-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 100;
+  list-style: none;
+  padding: 4px;
+  margin: 0;
+  animation: fadeUp 0.15s ease-out;
+}
+
+.host-dropdown li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.host-dropdown li:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.history-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.history-host {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-detail {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.history-remove {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s, background 0.15s;
+}
+
+.host-dropdown li:hover .history-remove {
+  opacity: 1;
+}
+
+.history-remove:hover {
+  color: var(--red);
+  background: rgba(255, 123, 114, 0.12);
+}
 .connect-btn {
   width: 100%;
   height: 46px;

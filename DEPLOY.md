@@ -66,9 +66,20 @@ server {
     listen 80;
     server_name yourdomain.com;
 
+    # MIME types — required so .js files are served as application/javascript
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
     # Serve the built React frontend
     root /opt/juni-cli/client/dist;
     index index.html;
+
+    # Silence favicon 404
+    location = /favicon.ico {
+        log_not_found off;
+        access_log off;
+        return 204;
+    }
 
     # SPA fallback — all non-file routes serve index.html
     location / {

@@ -1,15 +1,101 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+
+const HISTORY_KEY = 'juni-cli:connection-history';
+const MAX_HISTORY = 20;
+
+function loadHistory() {
+  try {
+    return JSON.parse(localStorage.getItem(HISTORY_KEY)) || [];
+  } catch {
+    return [];
+  }
+}
+
+function saveToHistory({ host, port, username }) {
+  const history = loadHistory();
+  // Remove duplicate (same host+port+username)
+  const key = `${host}:${port}:${username}`;
+  const filtered = history.filter(
+    (h) => `${h.host}:${h.port}:${h.username}` !== key,
+  );
+  // Add to front (most recent first)
+  filtered.unshift({ host, port, username, lastUsed: Date.now() });
+  localStorage.setItem(
+    HISTORY_KEY,
+    JSON.stringify(filtered.slice(0, MAX_HISTORY)),
+  );
+}
+
+export { saveToHistory };
 
 export default function ConnectionForm({ onConnect }) {
   const [host, setHost] = useState('');
   const [port, setPort] = useState('22');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [history, setHistory] = useState([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [filteredHistory, setFilteredHistory] = useState([]);
+  const dropdownRef = useRef(null);
+  const hostRef = useRef(null);
+
+  useEffect(() => {
+    setHistory(loadHistory());
+  }, []);
+
+  useEffect(() => {
+    if (!host) {
+      setFilteredHistory(history);
+    } else {
+      setFilteredHistory(
+        history.filter((h) =>
+          h.host.toLowerCase().includes(host.toLowerCase()),
+        ),
+      );
+    }
+  }, [host, history]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target) &&
+        hostRef.current &&
+        !hostRef.current.contains(e.target)
+      ) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectHistory = (entry) => {
+    setHost(entry.host);
+    setPort(String(entry.port));
+    setUsername(entry.username);
+    setShowDropdown(false);
+    // Focus password since host/port/username are filled
+    document.getElementById('password')?.focus();
+  };
+
+  const removeHistory = (e, entry) => {
+    e.stopPropagation();
+    const key = `${entry.host}:${entry.port}:${entry.username}`;
+    const updated = history.filter(
+      (h) => `${h.host}:${h.port}:${h.username}` !== key,
+    );
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+    setHistory(updated);
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!host || !username) return;
-    onConnect({ host, port: Number(port), username, password });
+    const credentials = { host, port: Number(port), username, password };
+    saveToHistory(credentials);
+    onConnect(credentials);
   };
 
   return (
@@ -24,15 +110,56 @@ export default function ConnectionForm({ onConnect }) {
         <div className="form-grid">
           <div className="form-group host-group">
             <label htmlFor="host">Host</label>
-            <input
-              id="host"
-              type="text"
-              placeholder="192.168.1.1 or hostname"
-              value={host}
-              onChange={(e) => setHost(e.target.value)}
-              autoFocus
-              required
-            />
+            <div className="host-input-wrapper">
+              <input
+                id="host"
+                ref={hostRef}
+                type="text"
+                placeholder="192.168.1.1 or hostname"
+                value={host}
+                onChange={(e) => setHost(e.target.value)}
+                onFocus={() => history.length > 0 && setShowDropdown(true)}
+                autoComplete="off"
+                autoFocus
+                required
+              />
+              {history.length > 0 && (
+                <button
+                  type="button"
+                  className="dropdown-toggle"
+                  onClick={() => setShowDropdown(!showDropdown)}
+                  tabIndex={-1}
+                  aria-label="Show connection history"
+                >
+                  ▾
+                </button>
+              )}
+              {showDropdown && filteredHistory.length > 0 && (
+                <ul className="host-dropdown" ref={dropdownRef}>
+                  {filteredHistory.map((entry) => (
+                    <li
+                      key={`${entry.host}:${entry.port}:${entry.username}`}
+                      onClick={() => selectHistory(entry)}
+                    >
+                      <div className="history-entry">
+                        <span className="history-host">{entry.host}</span>
+                        <span className="history-detail">
+                          {entry.username}@:{entry.port}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        className="history-remove"
+                        onClick={(e) => removeHistory(e, entry)}
+                        title="Remove from history"
+                      >
+                        ✕
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
 
           <div className="form-group port-group">
