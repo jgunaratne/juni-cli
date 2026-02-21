@@ -83,6 +83,7 @@ app.post('/api/gemini/chat', async (req, res) => {
     const vertexAI = getVertexClient(resolvedProject, resolvedLocation);
     const generativeModel = vertexAI.getGenerativeModel({
       model,
+      systemInstruction: 'You are a Linux expert. Every time you mention a terminal command, you must wrap it in <cmd> and </cmd> tags. Example: Use <cmd>ls -la</cmd> to list files.',
       generationConfig: {
         temperature: 0.7,
         maxOutputTokens: 4096,

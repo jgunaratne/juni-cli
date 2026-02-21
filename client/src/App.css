@@ -132,6 +132,49 @@
   background: var(--bg-primary);
   color: var(--text-primary);
 }
+.auto-execute-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.auto-execute-toggle:hover {
+  border-color: rgba(88, 166, 255, 0.3);
+  background: rgba(88, 166, 255, 0.06);
+}
+
+.auto-execute-toggle input[type="checkbox"] {
+  accent-color: var(--green);
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  margin: 0;
+}
+
+.auto-execute-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.auto-execute-toggle:has(input:checked) {
+  border-color: rgba(126, 231, 135, 0.4);
+  background: rgba(126, 231, 135, 0.08);
+}
+
+.auto-execute-toggle:has(input:checked) .auto-execute-label {
+  color: var(--green);
+}
 .status-bar {
   display: flex;
   align-items: center;
@@ -824,6 +867,27 @@
   color: #b1bac4;
 }
 
+.gemini-cmd-tag {
+  color: #7ee787;
+  background: rgba(126, 231, 135, 0.1);
+  border: 1px solid rgba(126, 231, 135, 0.25);
+  border-radius: 4px;
+  padding: 1px 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+.gemini-cmd-tag:hover {
+  background: rgba(126, 231, 135, 0.2);
+  border-color: rgba(126, 231, 135, 0.5);
+  color: #56d364;
+  text-decoration: underline;
+}
+
+.gemini-cmd-tag:active {
+  background: rgba(126, 231, 135, 0.3);
+}
 .gemini-term-line--error {
   margin-top: 4px;
 }

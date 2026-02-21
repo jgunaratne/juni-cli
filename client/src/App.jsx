@@ -20,6 +20,7 @@ function App() {
   const [splitGeminiStatus, setSplitGeminiStatus] = useState('connecting');
   const [splitFocus, setSplitFocus] = useState('left'); // 'left' or 'right'
   const [selectedModel, setSelectedModel] = useState('gemini-3-flash-preview');
+  const [autoExecute, setAutoExecute] = useState(false);
 
   const terminalRefs = useRef({});
   const splitGeminiRef = useRef(null);
@@ -123,6 +124,17 @@ function App() {
     termRef.focus();
   }, [splitMode, activeTab]);
 
+  const handleRunCommand = useCallback((cmd) => {
+    const sshTabId = activeTab && tabs.find((t) => t.id === activeTab && t.type === 'ssh')
+      ? activeTab
+      : tabs.find((t) => t.type === 'ssh')?.id;
+    if (!sshTabId) return;
+    const termRef = terminalRefs.current[sshTabId];
+    if (!termRef) return;
+    termRef.writeToTerminal(autoExecute ? cmd + '\n' : cmd);
+    termRef.focus();
+  }, [activeTab, tabs, autoExecute]);
+
   const getTabLabel = (tab) => {
     if (tab.type === 'gemini') return 'Gemini';
     return `${tab.connection.username}@${tab.connection.host}`;
@@ -185,6 +197,14 @@ function App() {
               <option key={m.id} value={m.id}>{m.label}</option>
             ))}
           </select>
+          <label className="auto-execute-toggle" title="When enabled, clicking a command will execute it immediately">
+            <input
+              type="checkbox"
+              checked={autoExecute}
+              onChange={(e) => setAutoExecute(e.target.checked)}
+            />
+            <span className="auto-execute-label">Auto-execute</span>
+          </label>
           <div className="status-bar">
             <span className={`status-dot ${activeSession?.status || ''}`} />
             <span className="status-text">{displayStatus}</span>
@@ -267,6 +287,7 @@ function App() {
                     isActive={tab.id === activeTab && !showForm}
                     onStatusChange={(status) => handleStatusChange(tab.id, status)}
                     onClose={() => handleCloseTab(tab.id)}
+                    onRunCommand={handleRunCommand}
                   />
                 )
             ),
@@ -285,6 +306,7 @@ function App() {
                 isActive={true}
                 onStatusChange={(status) => setSplitGeminiStatus(status)}
                 onClose={() => setSplitMode(false)}
+                onRunCommand={handleRunCommand}
               />
             </div>
           </>

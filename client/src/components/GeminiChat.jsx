@@ -35,7 +35,7 @@ function renderForTerminal(text) {
 
 /* ── Component ────────────────────────────────────────── */
 
-const GeminiChat = forwardRef(function GeminiChat({ model = 'gemini-3-flash-preview', isActive, onStatusChange }, ref) {
+const GeminiChat = forwardRef(function GeminiChat({ model = 'gemini-3-flash-preview', isActive, onStatusChange, onRunCommand }, ref) {
   useImperativeHandle(ref, () => ({
     focus: () => inputRef.current?.focus(),
     pasteText: (text) => {
@@ -225,7 +225,25 @@ const GeminiChat = forwardRef(function GeminiChat({ model = 'gemini-3-flash-prev
               </>
             )}
             {entry.type === 'model' && (
-              <pre className="gemini-term-response">{entry.text}</pre>
+              <pre className="gemini-term-response">
+                {entry.text.split(/(<cmd>.*?<\/cmd>)/g).map((part, j) => {
+                  const match = part.match(/^<cmd>(.*?)<\/cmd>$/);
+                  if (match) {
+                    const cmd = match[1];
+                    return (
+                      <span
+                        key={j}
+                        className="gemini-cmd-tag"
+                        title={`Click to run: ${cmd}`}
+                        onClick={() => onRunCommand?.(cmd)}
+                      >
+                        {cmd}
+                      </span>
+                    );
+                  }
+                  return part;
+                })}
+              </pre>
             )}
             {entry.type === 'error' && (
               <span className="gemini-term-error">error: {entry.text}</span>
