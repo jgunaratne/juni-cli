@@ -1,18 +1,27 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import ConnectionForm from './components/ConnectionForm';
 import Terminal from './components/Terminal';
+import GeminiChat from './components/GeminiChat';
 import './App.css';
 
 let nextId = 1;
 
 function App() {
-  const [tabs, setTabs] = useState([]);           // { id, connection, status }
-  const [activeTab, setActiveTab] = useState(null); // id or 'new'
+  const [tabs, setTabs] = useState([]);           // { id, type, connection?, status }
+  const [activeTab, setActiveTab] = useState(null); // id or null
   const [showForm, setShowForm] = useState(true);
 
   const handleConnect = useCallback((credentials) => {
     const id = nextId++;
-    const newTab = { id, connection: credentials, status: 'connecting' };
+    const newTab = { id, type: 'ssh', connection: credentials, status: 'connecting' };
+    setTabs((prev) => [...prev, newTab]);
+    setActiveTab(id);
+    setShowForm(false);
+  }, []);
+
+  const handleOpenGemini = useCallback(() => {
+    const id = nextId++;
+    const newTab = { id, type: 'gemini', status: 'connecting' };
     setTabs((prev) => [...prev, newTab]);
     setActiveTab(id);
     setShowForm(false);
@@ -28,7 +37,6 @@ function App() {
     (tabId) => {
       setTabs((prev) => {
         const updated = prev.filter((t) => t.id !== tabId);
-        // If we closed the active tab, switch to another or show form
         if (activeTab === tabId) {
           if (updated.length > 0) {
             setActiveTab(updated[updated.length - 1].id);
@@ -54,6 +62,17 @@ function App() {
     setShowForm(false);
   }, []);
 
+  // Label for a tab
+  const getTabLabel = (tab) => {
+    if (tab.type === 'gemini') return 'Gemini';
+    return `${tab.connection.username}@${tab.connection.host}`;
+  };
+
+  const getTabIcon = (tab) => {
+    if (tab.type === 'gemini') return '✦';
+    return null; // uses status dot for SSH
+  };
+
   // Determine status to display in header
   const activeSession = tabs.find((t) => t.id === activeTab);
   const displayStatus = showForm
@@ -76,17 +95,21 @@ function App() {
       </header>
 
       {/* ── Tab bar ──────────────────────────────────────── */}
-      {tabs.length > 0 && (
+      {(tabs.length > 0 || showForm) && (
         <div className="tab-bar">
           {tabs.map((tab) => (
             <div
               key={tab.id}
-              className={`tab ${tab.id === activeTab && !showForm ? 'active' : ''}`}
+              className={`tab ${tab.id === activeTab && !showForm ? 'active' : ''} ${tab.type === 'gemini' ? 'tab--gemini' : ''}`}
               onClick={() => switchTab(tab.id)}
             >
-              <span className={`tab-status-dot ${tab.status}`} />
+              {tab.type === 'gemini' ? (
+                <span className="tab-gemini-icon">✦</span>
+              ) : (
+                  <span className={`tab-status-dot ${tab.status}`} />
+              )}
               <span className="tab-label">
-                {tab.connection.username}@{tab.connection.host}
+                {getTabLabel(tab)}
               </span>
               <button
                 className="tab-close"
@@ -100,9 +123,20 @@ function App() {
               </button>
             </div>
           ))}
-          <button className="tab-new" onClick={handleNewTab} title="New connection">
-            +
-          </button>
+
+          {/* ── New tab buttons ─────────────────────────── */}
+          <div className="tab-new-group">
+            <button className="tab-new" onClick={handleNewTab} title="New SSH connection">
+              +
+            </button>
+            <button
+              className="tab-new tab-new--gemini"
+              onClick={handleOpenGemini}
+              title="New Gemini chat"
+            >
+              ✦
+            </button>
+          </div>
         </div>
       )}
 
@@ -110,16 +144,25 @@ function App() {
       <main className="app-main">
         {showForm && <ConnectionForm onConnect={handleConnect} />}
 
-        {tabs.map((tab) => (
-          <Terminal
-            key={tab.id}
-            tabId={tab.id}
-            connection={tab.connection}
-            isActive={tab.id === activeTab && !showForm}
-            onStatusChange={(status) => handleStatusChange(tab.id, status)}
-            onClose={() => handleCloseTab(tab.id)}
-          />
-        ))}
+        {tabs.map((tab) =>
+          tab.type === 'ssh' ? (
+            <Terminal
+              key={tab.id}
+              tabId={tab.id}
+              connection={tab.connection}
+              isActive={tab.id === activeTab && !showForm}
+              onStatusChange={(status) => handleStatusChange(tab.id, status)}
+              onClose={() => handleCloseTab(tab.id)}
+            />
+          ) : (
+            <GeminiChat
+              key={tab.id}
+              isActive={tab.id === activeTab && !showForm}
+              onStatusChange={(status) => handleStatusChange(tab.id, status)}
+              onClose={() => handleCloseTab(tab.id)}
+            />
+          ),
+        )}
       </main>
     </div>
   );

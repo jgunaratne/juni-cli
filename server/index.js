@@ -1,8 +1,29 @@
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const { Client } = require('ssh2');
+const { VertexAI } = require('@google-cloud/vertexai');
+
+/* ── Config ────────────────────────────────────────────────── */
+
+const DEFAULT_PROJECT = process.env.GCP_PROJECT_ID || '';
+const DEFAULT_LOCATION = process.env.GCP_LOCATION || 'us-central1';
+
+/* ── Vertex AI Client Cache ────────────────────────────────── */
+
+const clientCache = new Map();
+
+function getVertexClient(project, location) {
+  const key = `${project}::${location}`;
+  if (!clientCache.has(key)) {
+    clientCache.set(key, new VertexAI({ project, location }));
+  }
+  return clientCache.get(key);
+}
+
+/* ── Express + Socket.io ───────────────────────────────────── */
 
 const app = express();
 const server = http.createServer(app);
@@ -17,13 +38,73 @@ const io = new Server(server, {
 });
 
 app.use(cors());
+app.use(express.json({ limit: '2mb' }));
 
-// Health-check endpoint
+/* ── Health Check ──────────────────────────────────────────── */
+
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    project: DEFAULT_PROJECT || '(not set)',
+    location: DEFAULT_LOCATION,
+  });
 });
 
-// ── Socket.io connection handler ───────────────────────────────
+/* ── Gemini Chat Endpoint ──────────────────────────────────── */
+
+app.post('/api/gemini/chat', async (req, res) => {
+  try {
+    const {
+      model = 'gemini-2.5-flash',
+      messages = [],
+      project,
+      location,
+    } = req.body;
+
+    const resolvedProject = project || DEFAULT_PROJECT;
+    const resolvedLocation = location || DEFAULT_LOCATION;
+
+    if (!resolvedProject) {
+      return res.status(400).json({
+        error: 'GCP project ID is required. Set GCP_PROJECT_ID in server/.env.',
+      });
+    }
+
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: 'messages array is required' });
+    }
+
+    const contents = messages.map((m) => ({
+      role: m.role === 'model' ? 'model' : 'user',
+      parts: [{ text: m.text }],
+    }));
+
+    const vertexAI = getVertexClient(resolvedProject, resolvedLocation);
+    const generativeModel = vertexAI.getGenerativeModel({
+      model,
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 4096,
+      },
+    });
+
+    const result = await generativeModel.generateContent({ contents });
+    const response = result.response;
+    const text =
+      response?.candidates?.[0]?.content?.parts?.[0]?.text ??
+      'No response generated.';
+
+    res.json({ reply: text });
+  } catch (err) {
+    console.error('[gemini] Chat error:', err);
+    const message = err instanceof Error ? err.message : 'Internal server error';
+    res.status(500).json({ error: message });
+  }
+});
+
+/* ── Socket.io connection handler ──────────────────────────── */
+
 io.on('connection', (socket) => {
   console.log(`[socket] client connected  id=${socket.id}`);
 
@@ -123,8 +204,11 @@ io.on('connection', (socket) => {
   });
 });
 
-// ── Start ──────────────────────────────────────────────────────
+/* ── Start ──────────────────────────────────────────────────── */
+
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
+  console.log(`✦  juni-cli server running on http://localhost:${PORT}`);
+  console.log(`   GCP Project: ${DEFAULT_PROJECT || '(not set — set GCP_PROJECT_ID in .env)'}`);
+  console.log(`   GCP Location: ${DEFAULT_LOCATION}`);
 });

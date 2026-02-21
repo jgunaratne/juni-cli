@@ -184,6 +184,25 @@
   background: rgba(255, 123, 114, 0.15);
 }
 
+.tab--gemini .tab-gemini-icon {
+  font-size: 12px;
+  background: linear-gradient(135deg, #4285f4, #ea4335, #fbbc04, #34a853);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  flex-shrink: 0;
+}
+
+.tab--gemini.active {
+  border-bottom-color: #fbbc04;
+}
+
+.tab-new-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
 .tab-new {
   display: flex;
   align-items: center;
@@ -204,6 +223,16 @@
 .tab-new:hover {
   color: var(--accent);
   background: rgba(88, 166, 255, 0.08);
+}
+
+.tab-new--gemini {
+  font-size: 14px;
+  background: transparent;
+}
+
+.tab-new--gemini:hover {
+  color: #fbbc04;
+  background: rgba(251, 188, 4, 0.08);
 }
 /* ─── Main ────────────────────────────────────────────────── */
 .app-main {
@@ -526,4 +555,213 @@
 
 .terminal-viewport .xterm {
   height: 100%;
+}
+
+/* ─── Gemini Terminal ─────────────────────────────────────── */
+
+.gemini-toolbar-icon {
+  font-size: 14px;
+  background: linear-gradient(135deg, #4285f4, #ea4335, #fbbc04, #34a853);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gemini-terminal {
+  flex: 1;
+  padding: 16px;
+  background: #0d1117;
+  overflow-y: auto;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #c9d1d9;
+  cursor: text;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+
+.gemini-terminal::-webkit-scrollbar {
+  width: 6px;
+}
+
+.gemini-terminal::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.gemini-terminal::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+/* ── Welcome banner ─────────────────────────────── */
+
+.gemini-term-welcome {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 0 24px;
+  animation: fadeUp 0.4s ease-out;
+}
+
+.gemini-term-ascii {
+  white-space: pre;
+  font-size: 11px;
+  line-height: 1.2;
+  background: linear-gradient(135deg, #4285f4, #ea4335, #fbbc04, #34a853);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  opacity: 0.85;
+}
+
+.gemini-term-info {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.gemini-term-label {
+  color: #fbbc04;
+  font-weight: 500;
+}
+
+.gemini-term-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.gemini-term-cmd {
+  color: #58a6ff;
+  background: rgba(88, 166, 255, 0.1);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+/* ── Message lines ──────────────────────────────── */
+
+.gemini-term-line {
+  padding: 4px 0;
+  animation: geminiLineIn 0.15s ease-out;
+}
+
+@keyframes geminiLineIn {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.gemini-term-line--user {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-top: 12px;
+}
+
+.gemini-term-prompt-symbol {
+  color: #56d364;
+  font-weight: 600;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.gemini-term-prompt-text {
+  color: #f0f6fc;
+  font-weight: 500;
+}
+
+.gemini-term-line--model {
+  margin: 4px 0 12px 0;
+  padding-left: 16px;
+  border-left: 2px solid rgba(88, 166, 255, 0.2);
+}
+
+.gemini-term-response {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  color: #b1bac4;
+}
+
+.gemini-term-line--error {
+  margin-top: 4px;
+}
+
+.gemini-term-error {
+  color: #ff7b72;
+  font-weight: 500;
+}
+
+.gemini-term-line--system {
+  margin: 0;
+}
+
+.gemini-term-system {
+  color: #8b949e;
+}
+
+/* ── Loading spinner ────────────────────────────── */
+
+.gemini-term-line--loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.gemini-term-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(251, 188, 4, 0.2);
+  border-top-color: #fbbc04;
+  border-radius: 50%;
+  animation: geminiSpin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes geminiSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.gemini-term-loading-text {
+  color: #fbbc04;
+  font-size: 13px;
+  opacity: 0.8;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* ── Input line ─────────────────────────────────── */
+
+.gemini-term-input-line {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+  padding-top: 4px;
+}
+
+.gemini-term-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #f0f6fc;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  caret-color: #58a6ff;
+}
+
+.gemini-term-input::placeholder {
+  color: var(--text-muted);
+  font-weight: 400;
 }
