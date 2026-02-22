@@ -1187,8 +1187,8 @@
   
   .gemini-term-input-display {
   color: #f0f6fc;
-  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
-  font-size: 14px;
+  font-family: var(--terminal-font, 'JetBrains Mono', monospace);
+    font-size: var(--terminal-font-size, 14px);
   line-height: 1.5;
   white-space: pre;
 }
@@ -1197,7 +1197,7 @@
   position: absolute;
   inset: 0;
   opacity: 0;
-  font-size: 14px;
+  font-size: var(--terminal-font-size, 14px);
   border: none;
   background: none;
 }
@@ -1206,9 +1206,9 @@
 
 .gemini-term-cursor {
   display: inline-block;
-  width: 8.4px;
-  height: 18px;
-  background: #58a6ff;
+  width: 1ch;
+    height: 1.2em;
+    background: #f0f6fc;
   vertical-align: text-bottom;
   animation: geminiCursorBlink 1s step-end infinite;
 }

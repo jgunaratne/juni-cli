@@ -72,7 +72,7 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
       theme: {
         background: '#0d1117',
         foreground: '#c9d1d9',
-        cursor: '#58a6ff',
+        cursor: '#f0f6fc',
         cursorAccent: '#0d1117',
         selectionBackground: '#264f78',
         black: '#484f58',
@@ -170,24 +170,31 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
     });
 
     // Click-to-paste: clicking on selected text sends it as input
-    let pendingSelection = '';
-    const handleMouseDown = () => {
-      pendingSelection = term.getSelection();
-    };
-    const handleClick = () => {
-      if (pendingSelection && !term.getSelection()) {
-        socket.emit('ssh:data', pendingSelection);
-      }
-      pendingSelection = '';
-    };
+    let lastSelection = '';
+    const selDisposable = term.onSelectionChange(() => {
+      lastSelection = term.getSelection();
+    });
     const el = termRef.current;
+    const handleMouseDown = () => {
+      // If there was a selection and the mousedown will clear it, paste it
+      if (lastSelection) {
+        // Use setTimeout so xterm processes the mousedown first (clears selection)
+        const textToPaste = lastSelection;
+        setTimeout(() => {
+          // Only paste if the selection was actually cleared (user clicked, not started new selection)
+          if (!term.getSelection()) {
+            socket.emit('ssh:data', textToPaste);
+          }
+          lastSelection = '';
+        }, 50);
+      }
+    };
     el.addEventListener('mousedown', handleMouseDown);
-    el.addEventListener('click', handleClick);
 
     // ── Cleanup ───────────────────────────────────────────────
     return () => {
       el.removeEventListener('mousedown', handleMouseDown);
-      el.removeEventListener('click', handleClick);
+      selDisposable.dispose();
       resizeObserver.disconnect();
       socket.disconnect();
       term.dispose();
