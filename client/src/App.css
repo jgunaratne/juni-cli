@@ -659,6 +659,58 @@
   color: var(--red);
   background: rgba(255, 123, 114, 0.12);
 }
+.save-password-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.save-password-toggle input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 28px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
+  position: relative;
+  cursor: pointer;
+  margin: 0;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.save-password-toggle input[type="checkbox"]::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #484f58;
+  transition: all 0.2s;
+}
+
+.save-password-toggle input[type="checkbox"]:checked {
+  background: rgba(88, 166, 255, 0.3);
+}
+
+.save-password-toggle input[type="checkbox"]:checked::after {
+  left: 16px;
+  background: var(--accent);
+}
+
+.save-password-label {
+  font-size: 13px;
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.save-password-toggle:has(input:checked) .save-password-label {
+  color: var(--text-secondary);
+}
 .connect-btn {
   width: 100%;
   height: 46px;

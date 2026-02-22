@@ -11,15 +11,17 @@ function loadHistory() {
   }
 }
 
-function saveToHistory({ host, port, username }) {
+function saveToHistory({ host, port, username, password, savePassword }) {
   const history = loadHistory();
-  // Remove duplicate (same host+port+username)
   const key = `${host}:${port}:${username}`;
   const filtered = history.filter(
     (h) => `${h.host}:${h.port}:${h.username}` !== key,
   );
-  // Add to front (most recent first)
-  filtered.unshift({ host, port, username, lastUsed: Date.now() });
+  const entry = { host, port, username, lastUsed: Date.now() };
+  if (savePassword && password) {
+    entry.savedPassword = btoa(password);
+  }
+  filtered.unshift(entry);
   localStorage.setItem(
     HISTORY_KEY,
     JSON.stringify(filtered.slice(0, MAX_HISTORY)),
@@ -33,6 +35,7 @@ export default function ConnectionForm({ onConnect }) {
   const [port, setPort] = useState('22');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [savePassword, setSavePassword] = useState(false);
   const [history, setHistory] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [filteredHistory, setFilteredHistory] = useState([]);
@@ -75,9 +78,24 @@ export default function ConnectionForm({ onConnect }) {
     setHost(entry.host);
     setPort(String(entry.port));
     setUsername(entry.username);
+    if (entry.savedPassword) {
+      try {
+        setPassword(atob(entry.savedPassword));
+        setSavePassword(true);
+      } catch {
+        setPassword('');
+        setSavePassword(false);
+      }
+    } else {
+      setPassword('');
+      setSavePassword(false);
+    }
     setShowDropdown(false);
-    // Focus password since host/port/username are filled
-    document.getElementById('password')?.focus();
+    if (entry.savedPassword) {
+      document.querySelector('.connect-btn')?.focus();
+    } else {
+      document.getElementById('password')?.focus();
+    }
   };
 
   const removeHistory = (e, entry) => {
@@ -94,7 +112,7 @@ export default function ConnectionForm({ onConnect }) {
     e.preventDefault();
     if (!host || !username) return;
     const credentials = { host, port: Number(port), username, password };
-    saveToHistory(credentials);
+    saveToHistory({ ...credentials, savePassword });
     onConnect(credentials);
   };
 
@@ -197,6 +215,15 @@ export default function ConnectionForm({ onConnect }) {
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
+
+          <label className="save-password-toggle">
+            <input
+              type="checkbox"
+              checked={savePassword}
+              onChange={(e) => setSavePassword(e.target.checked)}
+            />
+            <span className="save-password-label">Save password</span>
+          </label>
         </div>
 
         <button type="submit" className="connect-btn">
