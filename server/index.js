@@ -1,10 +1,19 @@
 require('dotenv').config();
 const express = require('express');
 const http = require('http');
+const os = require('os');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const { Client } = require('ssh2');
+const pty = require('node-pty');
 const { VertexAI } = require('@google-cloud/vertexai');
+
+/* ── Local host detection ─────────────────────────────────── */
+
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
+function isLocalHost(host) {
+  return LOCAL_HOSTS.has(host.toLowerCase());
+}
 
 /* ── Config ────────────────────────────────────────────────── */
 
@@ -157,12 +166,44 @@ io.on('connection', (socket) => {
 
   let sshClient = null;
   let sshStream = null;
+  let ptyProcess = null;
   let pendingSize = { rows: 24, cols: 80 };
 
   // ── ssh:connect ──────────────────────────────────────────────
   socket.on('ssh:connect', (credentials) => {
     const { host, port = 22, username, password, privateKey } = credentials;
 
+    // ── Local shell mode (no SSH needed) ────────────────────────
+    if (isLocalHost(host)) {
+      console.log(`[local] spawning local shell for ${os.userInfo().username}`);
+      socket.emit('ssh:status', { status: 'authenticated' });
+
+      const shell = process.env.SHELL || (process.platform === 'win32' ? 'powershell.exe' : '/bin/bash');
+      ptyProcess = pty.spawn(shell, [], {
+        name: 'xterm-256color',
+        cols: pendingSize.cols,
+        rows: pendingSize.rows,
+        cwd: os.homedir(),
+        env: process.env,
+      });
+
+      socket.emit('ssh:status', { status: 'ready' });
+
+      // PTY → Browser
+      ptyProcess.onData((data) => {
+        socket.emit('ssh:output', data);
+      });
+
+      ptyProcess.onExit(({ exitCode }) => {
+        console.log(`[local] shell exited with code ${exitCode}`);
+        socket.emit('ssh:status', { status: 'disconnected' });
+        ptyProcess = null;
+      });
+
+      return;
+    }
+
+    // ── Remote SSH mode ────────────────────────────────────────
     console.log(`[ssh] connecting to ${username}@${host}:${port}`);
     sshClient = new Client();
 
@@ -232,24 +273,34 @@ io.on('connection', (socket) => {
     sshClient.connect(connectConfig);
   });
 
-  // ── ssh:data  (Browser → SSH) ───────────────────────────────
+  // ── ssh:data  (Browser → SSH / PTY) ─────────────────────────
   socket.on('ssh:data', (data) => {
-    if (sshStream) sshStream.write(data);
+    if (ptyProcess) {
+      ptyProcess.write(data);
+    } else if (sshStream) {
+      sshStream.write(data);
+    }
   });
 
   // ── ssh:resize ───────────────────────────────────────────────
   socket.on('ssh:resize', ({ cols, rows }) => {
     pendingSize = { rows, cols };
-    if (sshStream) sshStream.setWindow(rows, cols, 0, 0);
+    if (ptyProcess) {
+      ptyProcess.resize(cols, rows);
+    } else if (sshStream) {
+      sshStream.setWindow(rows, cols, 0, 0);
+    }
   });
 
   // ── disconnect ───────────────────────────────────────────────
   socket.on('disconnect', () => {
     console.log(`[socket] client disconnected  id=${socket.id}`);
+    if (ptyProcess) { ptyProcess.kill(); ptyProcess = null; }
     if (sshStream) sshStream.end();
     if (sshClient) sshClient.end();
   });
 });
+
 
 /* ── Start ──────────────────────────────────────────────────── */
 

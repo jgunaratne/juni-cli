@@ -30,6 +30,8 @@ function saveToHistory({ host, port, username, password, savePassword }) {
 
 export { saveToHistory };
 
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
+
 export default function ConnectionForm({ onConnect }) {
   const [host, setHost] = useState('');
   const [port, setPort] = useState('22');
@@ -39,6 +41,8 @@ export default function ConnectionForm({ onConnect }) {
   const [history, setHistory] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [filteredHistory, setFilteredHistory] = useState([]);
+
+  const isLocal = LOCAL_HOSTS.has(host.toLowerCase().trim());
   const dropdownRef = useRef(null);
   const hostRef = useRef(null);
 
@@ -110,19 +114,31 @@ export default function ConnectionForm({ onConnect }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!host || !username) return;
-    const credentials = { host, port: Number(port), username, password };
-    saveToHistory({ ...credentials, savePassword });
+    if (!host) return;
+    if (!isLocal && !username) return;
+    const credentials = {
+      host: host.trim(),
+      port: Number(port),
+      username: isLocal ? (username || os_username()) : username,
+      password: isLocal ? '' : password,
+    };
+    if (!isLocal) {
+      saveToHistory({ ...credentials, savePassword });
+    }
     onConnect(credentials);
   };
+
+  function os_username() {
+    return 'local';
+  }
 
   return (
     <div className="connection-form-wrapper">
       <form className="connection-form" onSubmit={handleSubmit}>
         <div className="form-header">
-          <span className="form-icon">🔐</span>
-          <h2>SSH Connection</h2>
-          <p className="form-subtitle">Connect to a remote server</p>
+          <span className="form-icon">{isLocal ? '💻' : '🔐'}</span>
+          <h2>{isLocal ? 'Local Terminal' : 'SSH Connection'}</h2>
+          <p className="form-subtitle">{isLocal ? 'Open a terminal on this machine' : 'Connect to a remote server'}</p>
         </div>
 
         <div className="form-grid">
@@ -193,42 +209,48 @@ export default function ConnectionForm({ onConnect }) {
             />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="username">Username</label>
-            <input
-              id="username"
-              type="text"
-              placeholder="root"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-            />
-          </div>
+          {!isLocal && (
+            <div className="form-group">
+              <label htmlFor="username">Username</label>
+              <input
+                id="username"
+                type="text"
+                placeholder="root"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+              />
+            </div>
+          )}
 
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
+          {!isLocal && (
+            <div className="form-group">
+              <label htmlFor="password">Password</label>
+              <input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+          )}
 
-          <label className="save-password-toggle">
-            <input
-              type="checkbox"
-              checked={savePassword}
-              onChange={(e) => setSavePassword(e.target.checked)}
-            />
-            <span className="save-password-label">Save password</span>
-          </label>
+          {!isLocal && (
+            <label className="save-password-toggle">
+              <input
+                type="checkbox"
+                checked={savePassword}
+                onChange={(e) => setSavePassword(e.target.checked)}
+              />
+              <span className="save-password-label">Save password</span>
+            </label>
+          )}
         </div>
 
         <button type="submit" className="connect-btn">
-          <span className="btn-icon">→</span>
-          Connect
+          <span className="btn-icon">{isLocal ? '▶' : '→'}</span>
+          {isLocal ? 'Open Local Terminal' : 'Connect'}
         </button>
       </form>
     </div>
