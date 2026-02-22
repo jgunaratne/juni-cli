@@ -13,51 +13,156 @@ const FRAGMENT_SHADER = `
   precision mediump float;
   varying vec2 v_uv;
   uniform vec2 u_resolution;
+  uniform int u_frame;
   uniform sampler2D u_source;
+
+  const float SHADOWMASK_VERTGAPWIDTH = 0.02;
+  const float SHADOWMASK_VERTHARDNESS = 0.1;
+  const float SHADOWMASK_HORIZGAPWIDTH = -1.0;
+  const float SHADOWMASK_HORIZARDNESS = 0.8;
+  const float SHADOWMASK_RCOL_OFFSET = 0.0;
+  const float SHADOWMASK_GCOL_OFFSET = -0.3;
+  const float SHADOWMASK_BCOL_OFFSET = -0.6;
+
+  const float SCANLINE_RGAPWIDTH = 2.0;
+  const float SCANLINE_RHARDNESS = 1.0;
+  const float SCANLINE_ROFFSET = 0.0 + 0.08333333;
+  const float SCANLINE_GGAPWIDTH = 2.0;
+  const float SCANLINE_GHARDNESS = 0.5;
+  const float SCANLINE_GOFFSET = -0.1 + 0.08333333;
+  const float SCANLINE_BGAPWIDTH = 2.0;
+  const float SCANLINE_BHARDNESS = 0.3;
+  const float SCANLINE_BOFFSET = -0.15 + 0.08333333;
+
+  const float SHADOWMASK_UV_SCALE = 0.12;
+  const float SCANLINE_UV_SCALE = 60.0;
+  const float SINE_SCALE = 3.14159 * 2.0;
+
+  // tanh polyfill for GLSL ES 1.0
+  float tanh_approx(float x) {
+    float e2x = exp(2.0 * x);
+    return (e2x - 1.0) / (e2x + 1.0);
+  }
+
+  // SHADOW MASK
+  float Grille(float x, float offset, float multiplier) {
+    return smoothstep(0.0, 1.0, sin(x * SINE_SCALE) * multiplier + offset);
+  }
+
+  float ShadowMaskRows(vec2 uv) {
+    uv.x *= 0.5;
+    uv.x -= floor(uv.x + 0.5);
+    if (uv.x < 0.0)
+      uv.y += 0.5;
+    return Grille(uv.y, -SHADOWMASK_HORIZGAPWIDTH, SHADOWMASK_HORIZARDNESS);
+  }
+
+  float ShadowMaskSingleCol(float x) {
+    return Grille(x, -SHADOWMASK_VERTGAPWIDTH, SHADOWMASK_VERTHARDNESS);
+  }
+
+  vec3 ShadowMaskRGBCols(float x) {
+    return vec3(
+      ShadowMaskSingleCol(x + SHADOWMASK_RCOL_OFFSET),
+      ShadowMaskSingleCol(x + SHADOWMASK_GCOL_OFFSET),
+      ShadowMaskSingleCol(x + SHADOWMASK_BCOL_OFFSET)
+    );
+  }
+
+  vec3 ShadowMask(vec2 uv) {
+    return ShadowMaskRGBCols(uv.x) * ShadowMaskRows(uv);
+  }
+
+  // SCANLINES
+  float Scanline(float x, float offset, float multiplier) {
+    return tanh_approx(sin(x * SINE_SCALE) * multiplier + offset) * 0.5 + 0.5;
+  }
+
+  float Interlacing() {
+    int frame = u_frame / 2;
+    return mod(float(frame), 2.0) < 1.0 ? 0.5 : 0.0;
+  }
+
+  vec4 Sample(vec2 uv, float resolution) {
+    if (uv.x < 0.0 || uv.x > 1.0) return vec4(0.0);
+    if (uv.y < 0.0 || uv.y > 1.0) return vec4(0.0);
+
+    float interlacing = Interlacing();
+    uv *= resolution;
+    uv.y += interlacing;
+
+    vec2 uv1 = vec2(uv.x, ceil(uv.y));
+    vec2 uv2 = vec2(uv.x, floor(uv.y));
+    float t = uv.y - floor(uv.y);
+    t = smoothstep(0.0, 1.0, t);
+
+    uv1.y -= interlacing;
+    uv2.y -= interlacing;
+
+    vec4 sample1 = texture2D(u_source, uv1 / resolution);
+    vec4 sample2 = texture2D(u_source, uv2 / resolution);
+
+    return mix(sample2, sample1, vec4(t));
+  }
+
+  vec3 ScanlinesRGB(float y) {
+    y += Interlacing();
+    return vec3(
+      Scanline(y + SCANLINE_ROFFSET, -SCANLINE_RGAPWIDTH, SCANLINE_RHARDNESS),
+      Scanline(y + SCANLINE_GOFFSET, -SCANLINE_GGAPWIDTH, SCANLINE_GHARDNESS),
+      Scanline(y + SCANLINE_BOFFSET, -SCANLINE_BGAPWIDTH, SCANLINE_BHARDNESS)
+    );
+  }
 
   float rbgToluminance(vec3 rgb) {
     return (rgb.r * 0.3) + (rgb.g * 0.59) + (rgb.b * 0.11);
   }
 
+  // CRT curvature
+  vec2 curve(vec2 uv) {
+    uv = (uv - 0.5) * 2.0;
+    uv *= 1.1;
+    uv.x *= 1.0 + pow((abs(uv.y) / 5.0), 2.0);
+    uv.y *= 1.0 + pow((abs(uv.x) / 4.0), 2.0);
+    uv = (uv / 2.0) + 0.5;
+    uv = uv * 0.92 + 0.04;
+    return uv;
+  }
+
   void main() {
     vec2 uv = v_uv;
-    vec2 pixelSize = 1.5 / u_resolution;
+    vec2 sampleUV = curve(uv);
+    vec2 shadowMaskUV = sampleUV * min(u_resolution, vec2(1920.0, 1080.0)) * SHADOWMASK_UV_SCALE;
+    vec2 scanlineUV = sampleUV * SCANLINE_UV_SCALE;
 
-    vec2 right = vec2(pixelSize.x, 0.0);
-    vec2 up = vec2(0.0, pixelSize.y);
+    // Input signal
+    vec3 color = Sample(sampleUV, SCANLINE_UV_SCALE).rgb;
 
-    // Sample center and neighbors for bloom
-    vec3 colorC = texture2D(u_source, uv).rgb;
-    vec3 colorT = texture2D(u_source, uv + up).rgb;
-    vec3 colorB = texture2D(u_source, uv - up).rgb;
-    vec3 colorL = texture2D(u_source, uv - right).rgb;
-    vec3 colorR = texture2D(u_source, uv + right).rgb;
+    // Convert to linear
+    color = pow(color, vec3(2.2));
 
-    vec2 right2 = right * 2.0;
-    vec2 up2 = up * 2.0;
+    // Vignette
+    float vig = abs(16.0 * sampleUV.x * sampleUV.y * (1.0 - sampleUV.x) * (1.0 - sampleUV.y));
+    color *= vec3(pow(vig, 0.6));
 
-    vec3 colorTR = texture2D(u_source, uv + up2 + right2).rgb;
-    vec3 colorTL = texture2D(u_source, uv + up2 - right2).rgb;
-    vec3 colorBR = texture2D(u_source, uv - up2 + right2).rgb;
-    vec3 colorBL = texture2D(u_source, uv - up2 - right2).rgb;
+    // Scanlines
+    color *= ScanlinesRGB(scanlineUV.y) * 40.0;
 
-    vec3 color = colorC
-      + (colorT + colorB + colorL + colorR) * 0.03
-      + (colorTR + colorTL + colorBR + colorBL) * 0.01;
+    // Shadow mask
+    color *= ShadowMask(shadowMaskUV) * 500.0;
 
     // Tonemap
-    float lum = rbgToluminance(color);
-    color += vec3(lum * 0.01);
-    color = color / (0.5 + mix(vec3(lum), color, 0.95));
+    color += vec3(rbgToluminance(color) * 0.05);
+    color = color / (0.5 + color);
 
-    // Gamma
+    // Convert to gamma
     color = pow(color, vec3(1.0 / 2.2));
 
     gl_FragColor = vec4(color, 1.0);
   }
 `;
 
-// Fallback shader when no source canvas is available (DOM-based content)
+// Fallback for DOM-based panels (no source canvas)
 const FALLBACK_FRAGMENT = `
   precision mediump float;
   varying vec2 v_uv;
@@ -66,17 +171,14 @@ const FALLBACK_FRAGMENT = `
 
   void main() {
     vec2 uv = v_uv;
-    // Scanlines
     float scanline = sin(uv.y * u_resolution.y * 1.5) * 0.5 + 0.5;
     scanline = pow(scanline, 1.8);
     float alpha = scanline * 0.06;
 
-    // Vignette
     vec2 vig = uv * 2.0 - 1.0;
     float v = 1.0 - dot(vig * 0.65, vig * 0.65);
     alpha += (1.0 - clamp(pow(v, 1.2), 0.0, 1.0)) * 0.3;
 
-    // Refresh line
     float rl = abs(uv.y - fract(u_time * 0.12));
     alpha += smoothstep(0.025, 0.0, rl) * 0.06;
 
@@ -110,10 +212,8 @@ function linkProgram(gl, vs, fs) {
 }
 
 function findSourceCanvas(parent) {
-  // xterm renders to a canvas inside .xterm-screen
   const xtermCanvas = parent.querySelector('.xterm-screen canvas');
   if (xtermCanvas) return xtermCanvas;
-  // Fallback: any canvas sibling that isn't ours
   const canvases = parent.querySelectorAll('canvas');
   for (const c of canvases) {
     if (!c.dataset.crtShader) return c;
@@ -136,8 +236,6 @@ export default function CrtShader() {
     const parent = canvas.parentElement;
     const sourceCanvas = findSourceCanvas(parent);
     const usePostProcess = !!sourceCanvas;
-
-    // Pick the right fragment shader
     const fragSource = usePostProcess ? FRAGMENT_SHADER : FALLBACK_FRAGMENT;
 
     const vs = compileShader(gl, gl.VERTEX_SHADER, VERTEX_SHADER);
@@ -147,7 +245,6 @@ export default function CrtShader() {
     const program = linkProgram(gl, vs, fs);
     if (!program) return;
 
-    // Fullscreen quad
     const buf = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, buf);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
@@ -158,9 +255,9 @@ export default function CrtShader() {
     const aPos = gl.getAttribLocation(program, 'a_position');
     const uRes = gl.getUniformLocation(program, 'u_resolution');
     const uSource = usePostProcess ? gl.getUniformLocation(program, 'u_source') : null;
+    const uFrame = usePostProcess ? gl.getUniformLocation(program, 'u_frame') : null;
     const uTime = !usePostProcess ? gl.getUniformLocation(program, 'u_time') : null;
 
-    // Create texture for source canvas
     let texture = null;
     if (usePostProcess) {
       texture = gl.createTexture();
@@ -171,7 +268,6 @@ export default function CrtShader() {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     }
 
-    // Enable blending for fallback mode
     if (!usePostProcess) {
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -192,9 +288,12 @@ export default function CrtShader() {
     observer.observe(parent);
     resize();
 
+    let frameCount = 0;
     const startTime = performance.now();
+
     const render = () => {
       const time = (performance.now() - startTime) / 1000;
+      frameCount++;
 
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
@@ -207,15 +306,15 @@ export default function CrtShader() {
       gl.uniform2f(uRes, canvas.width, canvas.height);
 
       if (usePostProcess && sourceCanvas) {
-        // Upload the terminal canvas as a texture each frame
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, texture);
         try {
           gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, sourceCanvas);
         } catch {
-          // Canvas might be tainted or unavailable
+          // Canvas may be tainted
         }
         gl.uniform1i(uSource, 0);
+        gl.uniform1i(uFrame, frameCount);
       } else if (uTime) {
         gl.uniform1f(uTime, time);
       }
