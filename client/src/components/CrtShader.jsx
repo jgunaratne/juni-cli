@@ -2,127 +2,89 @@ import { useEffect, useRef } from 'react';
 
 const VERTEX_SHADER = `
   attribute vec2 a_position;
+  varying vec2 v_uv;
   void main() {
+    v_uv = a_position * 0.5 + 0.5;
     gl_Position = vec4(a_position, 0.0, 1.0);
   }
 `;
 
 const FRAGMENT_SHADER = `
   precision mediump float;
-  uniform float u_time;
+  varying vec2 v_uv;
   uniform vec2 u_resolution;
+  uniform sampler2D u_source;
 
-  float time;
-
-  float noise(vec2 p) {
-    return sin(p.x * 10.) * sin(p.y * (3. + sin(time / 11.))) + .2;
-  }
-
-  mat2 rotate(float angle) {
-    return mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
-  }
-
-  float fbm(vec2 p) {
-    p *= 1.1;
-    float f = 0.;
-    float amp = .5;
-    for (int i = 0; i < 3; i++) {
-      mat2 modify = rotate(time / 50. * float(i * i));
-      f += amp * noise(p);
-      p = modify * p;
-      p *= 2.;
-      amp /= 2.2;
-    }
-    return f;
-  }
-
-  float pattern(vec2 p, out vec2 q, out vec2 r) {
-    q = vec2(fbm(p + vec2(1.)), fbm(rotate(.1 * time) * p + vec2(1.)));
-    r = vec2(fbm(rotate(.1) * q + vec2(0.)), fbm(q + vec2(0.)));
-    return fbm(p + 1. * r);
-  }
-
-  float sampleFont(vec2 p, float num) {
-    float glyph[2];
-    if (num < 1.)      { glyph[0] = 0.91333008; glyph[1] = 0.89746094; }
-    else if (num < 2.) { glyph[0] = 0.27368164; glyph[1] = 0.06933594; }
-    else if (num < 3.) { glyph[0] = 1.87768555; glyph[1] = 1.26513672; }
-    else if (num < 4.) { glyph[0] = 1.87719727; glyph[1] = 1.03027344; }
-    else if (num < 5.) { glyph[0] = 1.09643555; glyph[1] = 1.51611328; }
-    else if (num < 6.) { glyph[0] = 1.97045898; glyph[1] = 1.03027344; }
-    else if (num < 7.) { glyph[0] = 0.97045898; glyph[1] = 1.27246094; }
-    else if (num < 8.) { glyph[0] = 1.93945312; glyph[1] = 1.03222656; }
-    else if (num < 9.) { glyph[0] = 0.90893555; glyph[1] = 1.27246094; }
-    else               { glyph[0] = 0.90893555; glyph[1] = 1.52246094; }
-
-    float pos = floor(p.x + p.y * 5.);
-    if (pos < 13.) {
-      return step(1., mod(pow(2., pos) * glyph[0], 2.));
-    } else {
-      return step(1., mod(pow(2., pos - 13.) * glyph[1], 2.));
-    }
-  }
-
-  float digit(vec2 p) {
-    p -= vec2(0.5, 0.5);
-    p *= (1. + 0.15 * pow(length(p), 0.6));
-    p += vec2(0.5, 0.5);
-
-    p.x += sin(u_time / 7.) / 5.;
-    p.y += sin(u_time / 13.) / 5.;
-
-    vec2 grid = vec2(3., 1.) * 15.;
-    vec2 s = floor(p * grid) / grid;
-    p = p * grid;
-    vec2 q;
-    vec2 r;
-    float intensity = pattern(s / 10., q, r) * 1.3 - 0.03;
-    p = fract(p);
-    p *= vec2(1.2, 1.2);
-    float x = fract(p.x * 5.);
-    float y = fract((1. - p.y) * 5.);
-    vec2 fpos = vec2(floor(p.x * 5.), floor((1. - p.y) * 5.));
-    float isOn = sampleFont(fpos, floor(intensity * 10.));
-    return p.x <= 1. && p.y <= 1. ? isOn * (0.2 + y * 4. / 5.) * (0.75 + x / 4.) : 0.;
-  }
-
-  float hash(float x) {
-    return fract(sin(x * 234.1) * 324.19 + sin(sin(x * 3214.09) * 34.132 * x) + x * 234.12);
-  }
-
-  float onOff(float a, float b, float c) {
-    return step(c, sin(u_time + a * cos(u_time * b)));
-  }
-
-  float displace(vec2 look) {
-    float y = (look.y - mod(u_time / 4., 1.));
-    float window = 1. / (1. + 50. * y * y);
-    return sin(look.y * 20. + u_time) / 80. * onOff(4., 2., .8) * (1. + cos(u_time * 60.)) * window;
-  }
-
-  vec3 getColor(vec2 p) {
-    float bar = mod(p.y + time * 20., 1.) < 0.2 ? 1.4 : 1.;
-    p.x += displace(p);
-    float middle = digit(p);
-    float off = 0.002;
-    float sum = 0.;
-    for (float i = -1.; i < 2.; i += 1.) {
-      for (float j = -1.; j < 2.; j += 1.) {
-        sum += digit(p + vec2(off * i, off * j));
-      }
-    }
-    return vec3(0.9) * middle + sum / 10. * vec3(0., 1., 0.) * bar;
+  float rbgToluminance(vec3 rgb) {
+    return (rgb.r * 0.3) + (rgb.g * 0.59) + (rgb.b * 0.11);
   }
 
   void main() {
-    time = u_time / 3.;
-    vec2 p = gl_FragCoord.xy / u_resolution.xy;
-    vec3 col = getColor(p);
-    gl_FragColor = vec4(col, 1.0);
+    vec2 uv = v_uv;
+    vec2 pixelSize = 1.5 / u_resolution;
+
+    vec2 right = vec2(pixelSize.x, 0.0);
+    vec2 up = vec2(0.0, pixelSize.y);
+
+    // Sample center and neighbors for bloom
+    vec3 colorC = texture2D(u_source, uv).rgb;
+    vec3 colorT = texture2D(u_source, uv + up).rgb;
+    vec3 colorB = texture2D(u_source, uv - up).rgb;
+    vec3 colorL = texture2D(u_source, uv - right).rgb;
+    vec3 colorR = texture2D(u_source, uv + right).rgb;
+
+    vec2 right2 = right * 2.0;
+    vec2 up2 = up * 2.0;
+
+    vec3 colorTR = texture2D(u_source, uv + up2 + right2).rgb;
+    vec3 colorTL = texture2D(u_source, uv + up2 - right2).rgb;
+    vec3 colorBR = texture2D(u_source, uv - up2 + right2).rgb;
+    vec3 colorBL = texture2D(u_source, uv - up2 - right2).rgb;
+
+    vec3 color = colorC
+      + (colorT + colorB + colorL + colorR) * 0.03
+      + (colorTR + colorTL + colorBR + colorBL) * 0.01;
+
+    // Tonemap
+    float lum = rbgToluminance(color);
+    color += vec3(lum * 0.01);
+    color = color / (0.5 + mix(vec3(lum), color, 0.95));
+
+    // Gamma
+    color = pow(color, vec3(1.0 / 2.2));
+
+    gl_FragColor = vec4(color, 1.0);
   }
 `;
 
-function createShader(gl, type, source) {
+// Fallback shader when no source canvas is available (DOM-based content)
+const FALLBACK_FRAGMENT = `
+  precision mediump float;
+  varying vec2 v_uv;
+  uniform float u_time;
+  uniform vec2 u_resolution;
+
+  void main() {
+    vec2 uv = v_uv;
+    // Scanlines
+    float scanline = sin(uv.y * u_resolution.y * 1.5) * 0.5 + 0.5;
+    scanline = pow(scanline, 1.8);
+    float alpha = scanline * 0.06;
+
+    // Vignette
+    vec2 vig = uv * 2.0 - 1.0;
+    float v = 1.0 - dot(vig * 0.65, vig * 0.65);
+    alpha += (1.0 - clamp(pow(v, 1.2), 0.0, 1.0)) * 0.3;
+
+    // Refresh line
+    float rl = abs(uv.y - fract(u_time * 0.12));
+    alpha += smoothstep(0.025, 0.0, rl) * 0.06;
+
+    gl_FragColor = vec4(0.0, 0.0, 0.0, clamp(alpha, 0.0, 0.5));
+  }
+`;
+
+function compileShader(gl, type, source) {
   const shader = gl.createShader(type);
   gl.shaderSource(shader, source);
   gl.compileShader(shader);
@@ -134,7 +96,7 @@ function createShader(gl, type, source) {
   return shader;
 }
 
-function createProgram(gl, vs, fs) {
+function linkProgram(gl, vs, fs) {
   const program = gl.createProgram();
   gl.attachShader(program, vs);
   gl.attachShader(program, fs);
@@ -147,6 +109,18 @@ function createProgram(gl, vs, fs) {
   return program;
 }
 
+function findSourceCanvas(parent) {
+  // xterm renders to a canvas inside .xterm-screen
+  const xtermCanvas = parent.querySelector('.xterm-screen canvas');
+  if (xtermCanvas) return xtermCanvas;
+  // Fallback: any canvas sibling that isn't ours
+  const canvases = parent.querySelectorAll('canvas');
+  for (const c of canvases) {
+    if (!c.dataset.crtShader) return c;
+  }
+  return null;
+}
+
 export default function CrtShader() {
   const canvasRef = useRef(null);
   const rafRef = useRef(null);
@@ -154,33 +128,56 @@ export default function CrtShader() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    canvas.dataset.crtShader = 'true';
 
     const gl = canvas.getContext('webgl', { alpha: true, premultipliedAlpha: false });
-    if (!gl) {
-      console.warn('WebGL not available, CRT shader disabled');
-      return;
-    }
+    if (!gl) return;
 
-    const vs = createShader(gl, gl.VERTEX_SHADER, VERTEX_SHADER);
-    const fs = createShader(gl, gl.FRAGMENT_SHADER, FRAGMENT_SHADER);
+    const parent = canvas.parentElement;
+    const sourceCanvas = findSourceCanvas(parent);
+    const usePostProcess = !!sourceCanvas;
+
+    // Pick the right fragment shader
+    const fragSource = usePostProcess ? FRAGMENT_SHADER : FALLBACK_FRAGMENT;
+
+    const vs = compileShader(gl, gl.VERTEX_SHADER, VERTEX_SHADER);
+    const fs = compileShader(gl, gl.FRAGMENT_SHADER, fragSource);
     if (!vs || !fs) return;
 
-    const program = createProgram(gl, vs, fs);
+    const program = linkProgram(gl, vs, fs);
     if (!program) return;
 
-    const positionBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    // Fullscreen quad
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
       -1, -1, 1, -1, -1, 1,
       -1, 1, 1, -1, 1, 1,
     ]), gl.STATIC_DRAW);
 
-    const aPosition = gl.getAttribLocation(program, 'a_position');
-    const uTime = gl.getUniformLocation(program, 'u_time');
-    const uResolution = gl.getUniformLocation(program, 'u_resolution');
+    const aPos = gl.getAttribLocation(program, 'a_position');
+    const uRes = gl.getUniformLocation(program, 'u_resolution');
+    const uSource = usePostProcess ? gl.getUniformLocation(program, 'u_source') : null;
+    const uTime = !usePostProcess ? gl.getUniformLocation(program, 'u_time') : null;
+
+    // Create texture for source canvas
+    let texture = null;
+    if (usePostProcess) {
+      texture = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    }
+
+    // Enable blending for fallback mode
+    if (!usePostProcess) {
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    }
 
     const resize = () => {
-      const parent = canvas.parentElement;
       if (!parent) return;
       const { width, height } = parent.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
@@ -192,7 +189,7 @@ export default function CrtShader() {
     };
 
     const observer = new ResizeObserver(resize);
-    observer.observe(canvas.parentElement);
+    observer.observe(parent);
     resize();
 
     const startTime = performance.now();
@@ -203,15 +200,27 @@ export default function CrtShader() {
       gl.clear(gl.COLOR_BUFFER_BIT);
 
       gl.useProgram(program);
-      gl.enableVertexAttribArray(aPosition);
-      gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-      gl.vertexAttribPointer(aPosition, 2, gl.FLOAT, false, 0, 0);
+      gl.enableVertexAttribArray(aPos);
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+      gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
 
-      gl.uniform1f(uTime, time);
-      gl.uniform2f(uResolution, canvas.width, canvas.height);
+      gl.uniform2f(uRes, canvas.width, canvas.height);
+
+      if (usePostProcess && sourceCanvas) {
+        // Upload the terminal canvas as a texture each frame
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        try {
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, sourceCanvas);
+        } catch {
+          // Canvas might be tainted or unavailable
+        }
+        gl.uniform1i(uSource, 0);
+      } else if (uTime) {
+        gl.uniform1f(uTime, time);
+      }
 
       gl.drawArrays(gl.TRIANGLES, 0, 6);
-
       rafRef.current = requestAnimationFrame(render);
     };
 
@@ -220,10 +229,11 @@ export default function CrtShader() {
     return () => {
       cancelAnimationFrame(rafRef.current);
       observer.disconnect();
+      if (texture) gl.deleteTexture(texture);
       gl.deleteProgram(program);
       gl.deleteShader(vs);
       gl.deleteShader(fs);
-      gl.deleteBuffer(positionBuffer);
+      gl.deleteBuffer(buf);
     };
   }, []);
 
@@ -235,7 +245,6 @@ export default function CrtShader() {
         inset: 0,
         pointerEvents: 'none',
         zIndex: 20,
-        mixBlendMode: 'screen',
       }}
     />
   );
