@@ -1125,7 +1125,7 @@
   font-weight: 400;
   line-height: 1.5;
   color: #c9d1d9;
-  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='16'%3E%3Crect width='8' height='16' fill='white' opacity='0.8'/%3E%3C/svg%3E") 4 8, text;
+  cursor: text;
   user-select: text;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
@@ -1336,12 +1336,13 @@
   font-size: var(--terminal-font-size, 14px);
   line-height: 1.5;
   color: #f0f6fc;
-    background: none;
+  background: none;
   border: none;
-    outline: none;
-      caret-color: #f0f6fc;
-      padding: 0;
-      margin: 0;
+  outline: none;
+    caret-color: #f0f6fc;
+  caret-shape: block;
+  padding: 0;
+    margin: 0;
 }
 /* ── Agent mode ──────────────────────────────────── */
 
