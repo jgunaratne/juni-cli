@@ -189,14 +189,6 @@ const ClaudeChat = forwardRef(function ClaudeChat({ model = 'claude-sonnet-4-202
         {/* Welcome banner */}
         {messages.length === 0 && !isLoading && (
           <div className="gemini-term-welcome">
-            <div className="gemini-term-ascii claude-term-ascii">
-              {` ██████╗██╗      █████╗ ██╗   ██╗██████╗ ███████╗
-██╔════╝██║     ██╔══██╗██║   ██║██╔══██╗██╔════╝
-██║     ██║     ███████║██║   ██║██║  ██║█████╗  
-██║     ██║     ██╔══██║██║   ██║██║  ██║██╔══╝  
-╚██████╗███████╗██║  ██║╚██████╔╝██████╔╝███████╗
- ╚═════╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚══════╝`}
-            </div>
             <div className="gemini-term-info">
               <span className="gemini-term-label claude-term-label">{model}</span> via Anthropic API
             </div>

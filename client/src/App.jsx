@@ -58,6 +58,7 @@ function App() {
   const saved = loadSettings();
   const [fontFamily, setFontFamily] = useState(saved.fontFamily || 'JetBrains Mono');
   const [fontSize, setFontSize] = useState(saved.fontSize || 14);
+  const [claudeEnabled, setClaudeEnabled] = useState(saved.claudeEnabled ?? false);
 
   const terminalRefs = useRef({});
   const splitGeminiRef = useRef(null);
@@ -71,8 +72,8 @@ function App() {
 
   // Persist settings
   useEffect(() => {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ fontFamily, fontSize }));
-  }, [fontFamily, fontSize]);
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ fontFamily, fontSize, claudeEnabled }));
+  }, [fontFamily, fontSize, claudeEnabled]);
 
   // Apply CSS variables for Gemini terminal
   useEffect(() => {
@@ -317,6 +318,14 @@ function App() {
                     onChange={(e) => setFontSize(Number(e.target.value))}
                   />
                 </div>
+                <label className="settings-toggle">
+                  <input
+                    type="checkbox"
+                    checked={claudeEnabled}
+                    onChange={(e) => setClaudeEnabled(e.target.checked)}
+                  />
+                  <span className="settings-toggle-label">Enable Claude</span>
+                </label>
                 <div className="settings-preview" style={{ fontFamily: `'${fontFamily}', monospace`, fontSize: `${fontSize}px` }}>
                   The quick brown fox jumps over the lazy dog
                 </div>
@@ -374,13 +383,15 @@ function App() {
             >
               ✦
             </button>
-            <button
-              className="tab-new tab-new--claude"
-              onClick={handleOpenClaude}
-              title="New Claude chat"
-            >
-              ◈
-            </button>
+            {claudeEnabled && (
+              <button
+                className="tab-new tab-new--claude"
+                onClick={handleOpenClaude}
+                title="New Claude chat"
+              >
+                ◈
+              </button>
+            )}
           </div>
         </div>
       )}

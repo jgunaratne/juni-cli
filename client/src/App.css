@@ -343,6 +343,60 @@
   border: 2px solid var(--bg-secondary);
 }
 
+.settings-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  margin-bottom: 14px;
+}
+
+.settings-toggle input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 28px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
+  position: relative;
+  cursor: pointer;
+  margin: 0;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+
+.settings-toggle input[type="checkbox"]::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #484f58;
+  transition: all 0.2s;
+}
+
+.settings-toggle input[type="checkbox"]:checked {
+  background: rgba(212, 165, 116, 0.3);
+}
+
+.settings-toggle input[type="checkbox"]:checked::after {
+  left: 16px;
+  background: #d4a574;
+}
+
+.settings-toggle-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.settings-toggle:has(input:checked) .settings-toggle-label {
+  color: var(--text-secondary);
+}
 .settings-preview {
   padding: 10px;
   background: var(--bg-primary);
