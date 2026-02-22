@@ -2,6 +2,25 @@ import { useState, useCallback, useRef, useEffect, forwardRef, useImperativeHand
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || window.location.origin;
 
+const CHAT_HISTORY_KEY = 'juni-cli:gemini-chat';
+const CMD_HISTORY_KEY = 'juni-cli:gemini-cmd-history';
+
+function loadChatHistory() {
+  try {
+    return JSON.parse(localStorage.getItem(CHAT_HISTORY_KEY)) || [];
+  } catch {
+    return [];
+  }
+}
+
+function loadCmdHistory() {
+  try {
+    return JSON.parse(localStorage.getItem(CMD_HISTORY_KEY)) || [];
+  } catch {
+    return [];
+  }
+}
+
 /* ── API helpers ─────────────────────────────────────── */
 
 async function callGemini(model, messages) {
@@ -44,10 +63,10 @@ const GeminiChat = forwardRef(function GeminiChat({ model = 'gemini-3-flash-prev
     },
   }));
 
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState(loadChatHistory);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [commandHistory, setCommandHistory] = useState([]);
+  const [commandHistory, setCommandHistory] = useState(loadCmdHistory);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
@@ -56,6 +75,16 @@ const GeminiChat = forwardRef(function GeminiChat({ model = 'gemini-3-flash-prev
   useEffect(() => {
     onStatusChange('ready');
   }, [onStatusChange]);
+
+  // Persist chat history to localStorage
+  useEffect(() => {
+    localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(messages));
+  }, [messages]);
+
+  // Persist command history to localStorage
+  useEffect(() => {
+    localStorage.setItem(CMD_HISTORY_KEY, JSON.stringify(commandHistory));
+  }, [commandHistory]);
 
   // Auto-scroll when new messages arrive or user is typing
   useEffect(() => {
@@ -78,6 +107,7 @@ const GeminiChat = forwardRef(function GeminiChat({ model = 'gemini-3-flash-prev
     // Handle special commands
     if (text === 'clear') {
       setMessages([]);
+      setCommandHistory([]);
       setInput('');
       return;
     }
