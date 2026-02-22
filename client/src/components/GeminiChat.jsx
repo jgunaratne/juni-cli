@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
-import CrtShader from './CrtShader';
+
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || window.location.origin;
 
@@ -78,7 +78,7 @@ const GeminiChat = forwardRef(function GeminiChat({
   onRunCommand,
   agentMode = false,
   onRunAgentCommand,
-  crtEffect = false,
+
 }, ref) {
   const pastedTextRef = useRef(null);
   const autoSendRef = useRef(false);
@@ -454,7 +454,7 @@ const GeminiChat = forwardRef(function GeminiChat({
         }}
         style={{ position: 'relative' }}
       >
-        {crtEffect && <CrtShader />}
+
         {/* Welcome banner */}
         {messages.length === 0 && agentSteps.length === 0 && !isLoading && (
           <div className="gemini-term-welcome">

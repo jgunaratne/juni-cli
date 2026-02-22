@@ -3,7 +3,7 @@ import ConnectionForm from './components/ConnectionForm';
 import Terminal from './components/Terminal';
 import GeminiChat from './components/GeminiChat';
 import ClaudeChat from './components/ClaudeChat';
-import CrtShader from './components/CrtShader';
+
 import './App.css';
 
 let nextId = 1;
@@ -64,7 +64,7 @@ function App() {
   const [fontFamily, setFontFamily] = useState(saved.fontFamily || 'JetBrains Mono');
   const [fontSize, setFontSize] = useState(saved.fontSize || 14);
   const [bgColor, setBgColor] = useState(saved.bgColor || '#0d1117');
-  const [crtEffect, setCrtEffect] = useState(saved.crtEffect ?? false);
+
   const [claudeEnabled, setClaudeEnabled] = useState(saved.claudeEnabled ?? false);
 
   const terminalRefs = useRef({});
@@ -78,8 +78,8 @@ function App() {
   }, [fontFamily]);
 
   useEffect(() => {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ fontFamily, fontSize, bgColor, crtEffect, claudeEnabled, splitMode }));
-  }, [fontFamily, fontSize, bgColor, crtEffect, claudeEnabled, splitMode]);
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ fontFamily, fontSize, bgColor, claudeEnabled, splitMode }));
+  }, [fontFamily, fontSize, bgColor, claudeEnabled, splitMode]);
 
   useEffect(() => {
     document.documentElement.style.setProperty('--terminal-font', `'${fontFamily}', monospace`);
@@ -384,14 +384,7 @@ function App() {
                   />
                   <span className="settings-toggle-label">Enable Claude</span>
                 </label>
-                <label className="settings-toggle">
-                  <input
-                    type="checkbox"
-                    checked={crtEffect}
-                    onChange={(e) => setCrtEffect(e.target.checked)}
-                  />
-                  <span className="settings-toggle-label">CRT Shader</span>
-                </label>
+
                 <div className="settings-preview" style={{ fontFamily: `'${fontFamily}', monospace`, fontSize: `${fontSize}px` }}>
                   The quick brown fox jumps over the lazy dog
                 </div>
@@ -486,7 +479,7 @@ function App() {
                 fontFamily={fontFamily}
                 fontSize={fontSize}
                 bgColor={bgColor}
-                crtEffect={crtEffect}
+
               />
             ) : tab.type === 'gemini' ? (
               !splitMode && (
@@ -499,7 +492,7 @@ function App() {
                   onRunCommand={handleRunCommand}
                     agentMode={agentMode}
                     onRunAgentCommand={handleRunAgentCommand}
-                    crtEffect={crtEffect}
+
                 />
               )
             ) : tab.type === 'claude' ? (
@@ -510,7 +503,7 @@ function App() {
                   onStatusChange={(status) => handleStatusChange(tab.id, status)}
                   onClose={() => handleCloseTab(tab.id)}
                   onRunCommand={handleRunCommand}
-                      crtEffect={crtEffect}
+
                 />
               )
             ) : null,
@@ -532,7 +525,7 @@ function App() {
                 onRunCommand={handleRunCommand}
                 agentMode={agentMode}
                 onRunAgentCommand={handleRunAgentCommand}
-                crtEffect={crtEffect}
+
               />
             </div>
           </>
