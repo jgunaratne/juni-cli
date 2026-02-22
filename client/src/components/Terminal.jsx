@@ -66,8 +66,8 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
     const term = new XTerm({
       cursorBlink: true,
       cursorStyle: 'block',
-      fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Code", monospace',
-      fontSize: 14,
+      fontFamily: fontFamily ? `'${fontFamily}', monospace` : '"JetBrains Mono", "Fira Code", "Cascadia Code", monospace',
+      fontSize: fontSize || 14,
       lineHeight: 1.35,
       theme: {
         background: '#0d1117',
