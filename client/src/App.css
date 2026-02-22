@@ -1096,7 +1096,8 @@
   background: #0d1117;
   overflow-y: auto;
   font-family: var(--terminal-font, 'JetBrains Mono', monospace);
-    font-size: var(--terminal-font-size, 14px);
+  font-size: var(--terminal-font-size, 14px);
+  font-weight: 400;
   line-height: 1.5;
   color: #c9d1d9;
   cursor: text;
@@ -1105,6 +1106,13 @@
   scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
 }
 
+.gemini-terminal *,
+.gemini-terminal *::before,
+.gemini-terminal *::after {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+}
 .gemini-terminal::-webkit-scrollbar {
   width: 6px;
 }
@@ -1445,8 +1453,6 @@
   margin: 4px 0;
   padding: 10px 14px;
   border-radius: 6px;
-  font-family: var(--terminal-font, 'JetBrains Mono', monospace);
-  font-size: var(--terminal-font-size, 14px);
   animation: agentStepFadeIn 0.25s ease-out;
 }
 
@@ -1463,8 +1469,8 @@
 }
 
 .agent-step--command {
-  background: rgba(240, 160, 80, 0.05);
-  border: 1px solid rgba(240, 160, 80, 0.15);
+  background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .agent-step-header {
