@@ -163,15 +163,21 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
       // Agent sentinel watcher
       if (agentCaptureRef.current) {
         agentCaptureRef.current.buffer += data;
-        if (agentCaptureRef.current.buffer.includes(AGENT_SENTINEL)) {
+        // Look for sentinel on its own line (the actual echo output),
+        // not the one embedded in the echoed command line
+        const sentinelLine = '\n' + AGENT_SENTINEL;
+        if (agentCaptureRef.current.buffer.includes(sentinelLine)) {
           const { buffer, resolve, timer } = agentCaptureRef.current;
           clearTimeout(timer);
           agentCaptureRef.current = null;
-          // Extract output before the sentinel, strip ANSI and clean up
-          const idx = buffer.indexOf(AGENT_SENTINEL);
-          const output = buffer.substring(0, idx)
-            .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '') // strip ANSI escapes
-            .trim();
+          const stripped = buffer.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+          const idx = stripped.indexOf(sentinelLine);
+          // Skip the first line (echoed command) and extract actual output
+          const raw = stripped.substring(0, idx);
+          const firstNewline = raw.indexOf('\n');
+          const output = firstNewline >= 0
+            ? raw.substring(firstNewline + 1).trim()
+            : raw.trim();
           resolve(output);
         }
       }
