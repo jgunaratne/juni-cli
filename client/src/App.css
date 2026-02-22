@@ -1073,8 +1073,8 @@
 .terminal-viewport {
   flex: 1;
   min-height: 0;
-  padding: 8px;
-  background: #0d1117;
+  padding: 16px;
+    background: var(--terminal-bg, #0d1117);
   overflow: hidden;
 }
 
@@ -1095,7 +1095,7 @@
 .gemini-terminal {
   flex: 1;
   padding: 16px;
-  background: #0d1117;
+  background: var(--terminal-bg, #0d1117);
   overflow-y: auto;
   font-family: var(--terminal-font, 'JetBrains Mono', monospace);
   font-size: var(--terminal-font-size, 14px);
@@ -1471,7 +1471,7 @@
 }
 
 .agent-step--command {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--terminal-bg, #0d1117);
     border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
@@ -1483,7 +1483,7 @@
 .agent-step-command {
   padding: 6px 10px;
   margin: 4px 0;
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--terminal-bg, #0d1117);
   border-radius: 4px;
   color: #7ee787;
   font-size: inherit;
@@ -1493,7 +1493,7 @@
 .agent-step-output {
   margin: 6px 0 0;
   padding: 8px 10px;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--terminal-bg, #0d1117);
   border-radius: 4px;
   color: var(--text-secondary);
   font-size: inherit;
@@ -1514,7 +1514,7 @@
 }
 
 .agent-step--complete {
-  background: rgba(126, 231, 135, 0.06);
+  background: var(--terminal-bg, #0d1117);
   border: 1px solid rgba(126, 231, 135, 0.2);
 }
 
@@ -1526,7 +1526,7 @@
 
 
 .agent-step--aborted {
-  background: rgba(255, 123, 114, 0.06);
+  background: var(--terminal-bg, #0d1117);
   border: 1px solid rgba(255, 123, 114, 0.15);
   color: var(--text-muted);
 }
@@ -1536,7 +1536,7 @@
 }
 
 .agent-step--error {
-  background: rgba(255, 123, 114, 0.06);
+  background: var(--terminal-bg, #0d1117);
   border: 1px solid rgba(255, 123, 114, 0.2);
 }
 

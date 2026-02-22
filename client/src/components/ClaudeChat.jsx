@@ -175,7 +175,7 @@ const ClaudeChat = forwardRef(function ClaudeChat({ model = 'claude-sonnet-4-202
           <span className="terminal-title">claude — Anthropic API</span>
         </div>
         <button className="disconnect-btn" onClick={handleClear}>
-          ⌫ Clear
+          ⌫
         </button>
       </div>
 

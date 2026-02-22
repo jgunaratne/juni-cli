@@ -8,7 +8,7 @@ const SERVER_URL = import.meta.env.VITE_SERVER_URL || window.location.origin;
 
 const AGENT_SENTINEL = '__JUNI_AGENT_DONE__';
 
-const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onStatusChange, onClose, fontFamily, fontSize }, ref) {
+const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onStatusChange, onClose, fontFamily, fontSize, bgColor }, ref) {
   const termRef = useRef(null);
   const xtermRef = useRef(null);
   const fitRef = useRef(null);
@@ -91,7 +91,7 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
       fontSize: fontSize || 14,
       lineHeight: 1.35,
       theme: {
-        background: '#0d1117',
+        background: bgColor || '#0d1117',
         foreground: '#c9d1d9',
         cursor: '#f0f6fc',
         cursorAccent: '#0d1117',
@@ -256,7 +256,7 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
           </span>
         </div>
         <button className="disconnect-btn" onClick={onClose}>
-          ✕ Close
+          ✕
         </button>
       </div>
       <div className="terminal-viewport" ref={termRef} />

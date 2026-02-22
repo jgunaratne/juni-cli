@@ -48,7 +48,10 @@ function App() {
   const [tabs, setTabs] = useState([]);           // { id, type, connection?, status }
   const [activeTab, setActiveTab] = useState(null); // id or null
   const [showForm, setShowForm] = useState(true);
-  const [splitMode, setSplitMode] = useState(false);
+  const [splitMode, setSplitMode] = useState(() => {
+    const s = loadSettings();
+    return s.splitMode ?? false;
+  });
   const [splitGeminiStatus, setSplitGeminiStatus] = useState('connecting');
   const [splitFocus, setSplitFocus] = useState('left'); // 'left' or 'right'
   const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
@@ -59,6 +62,7 @@ function App() {
   const saved = loadSettings();
   const [fontFamily, setFontFamily] = useState(saved.fontFamily || 'JetBrains Mono');
   const [fontSize, setFontSize] = useState(saved.fontSize || 14);
+  const [bgColor, setBgColor] = useState(saved.bgColor || '#0d1117');
   const [claudeEnabled, setClaudeEnabled] = useState(saved.claudeEnabled ?? false);
 
   const terminalRefs = useRef({});
@@ -71,16 +75,15 @@ function App() {
     if (font?.google) loadGoogleFont(fontFamily);
   }, [fontFamily]);
 
-  // Persist settings
   useEffect(() => {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ fontFamily, fontSize, claudeEnabled }));
-  }, [fontFamily, fontSize, claudeEnabled]);
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ fontFamily, fontSize, bgColor, claudeEnabled, splitMode }));
+  }, [fontFamily, fontSize, bgColor, claudeEnabled, splitMode]);
 
-  // Apply CSS variables for Gemini terminal
   useEffect(() => {
     document.documentElement.style.setProperty('--terminal-font', `'${fontFamily}', monospace`);
     document.documentElement.style.setProperty('--terminal-font-size', `${fontSize}px`);
-  }, [fontFamily, fontSize]);
+    document.documentElement.style.setProperty('--terminal-bg', bgColor);
+  }, [fontFamily, fontSize, bgColor]);
 
   // Close settings when clicking outside
   useEffect(() => {
@@ -346,6 +349,24 @@ function App() {
                     onChange={(e) => setFontSize(Number(e.target.value))}
                   />
                 </div>
+                <div className="settings-group">
+                  <label className="settings-label">Background Color</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <input
+                      type="color"
+                      value={bgColor}
+                      onChange={(e) => setBgColor(e.target.value)}
+                      style={{ width: '32px', height: '32px', border: 'none', cursor: 'pointer', background: 'none' }}
+                    />
+                    <input
+                      className="settings-input"
+                      type="text"
+                      value={bgColor}
+                      onChange={(e) => setBgColor(e.target.value)}
+                      style={{ flex: 1 }}
+                    />
+                  </div>
+                </div>
                 <label className="settings-toggle">
                   <input
                     type="checkbox"
@@ -447,6 +468,7 @@ function App() {
                 onClose={() => handleCloseTab(tab.id)}
                 fontFamily={fontFamily}
                 fontSize={fontSize}
+                bgColor={bgColor}
               />
             ) : tab.type === 'gemini' ? (
               !splitMode && (

@@ -422,7 +422,7 @@ const GeminiChat = forwardRef(function GeminiChat({
             </button>
           )}
           <button className="disconnect-btn" onClick={handleClear}>
-            ⌫ Clear
+            ⌫
           </button>
         </div>
       </div>
