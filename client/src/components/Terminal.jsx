@@ -6,7 +6,7 @@ import '@xterm/xterm/css/xterm.css';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || window.location.origin;
 
-const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onStatusChange, onClose }, ref) {
+const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onStatusChange, onClose, fontFamily, fontSize }, ref) {
   useImperativeHandle(ref, () => ({
     focus: () => xtermRef.current?.focus(),
     getBufferText: () => {
@@ -52,6 +52,14 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
       });
     }
   }, [isActive]);
+
+  // Update font when settings change
+  useEffect(() => {
+    if (!xtermRef.current || !fitRef.current) return;
+    if (fontFamily) xtermRef.current.options.fontFamily = `'${fontFamily}', monospace`;
+    if (fontSize) xtermRef.current.options.fontSize = fontSize;
+    try { fitRef.current.fit(); } catch { /* not ready */ }
+  }, [fontFamily, fontSize]);
 
   useEffect(() => {
     // ── Initialise xterm ──────────────────────────────────────

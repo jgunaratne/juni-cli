@@ -12,6 +12,37 @@ const GEMINI_MODELS = [
   { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash' },
 ];
 
+const MONO_FONTS = [
+  { id: 'JetBrains Mono', label: 'JetBrains Mono', google: true },
+  { id: 'Fira Code', label: 'Fira Code', google: true },
+  { id: 'Source Code Pro', label: 'Source Code Pro', google: true },
+  { id: 'Inconsolata', label: 'Inconsolata', google: true },
+  { id: 'IBM Plex Mono', label: 'IBM Plex Mono', google: true },
+  { id: 'Space Mono', label: 'Space Mono', google: true },
+  { id: 'Roboto Mono', label: 'Roboto Mono', google: true },
+  { id: 'Ubuntu Mono', label: 'Ubuntu Mono', google: true },
+];
+
+const SETTINGS_KEY = 'juni-cli:settings';
+
+function loadSettings() {
+  try {
+    return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+function loadGoogleFont(fontName) {
+  const id = `gfont-${fontName.replace(/\s+/g, '-')}`;
+  if (document.getElementById(id)) return;
+  const link = document.createElement('link');
+  link.id = id;
+  link.rel = 'stylesheet';
+  link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(fontName)}:wght@400;500;700&display=swap`;
+  document.head.appendChild(link);
+}
+
 function App() {
   const [tabs, setTabs] = useState([]);           // { id, type, connection?, status }
   const [activeTab, setActiveTab] = useState(null); // id or null
@@ -21,9 +52,44 @@ function App() {
   const [splitFocus, setSplitFocus] = useState('left'); // 'left' or 'right'
   const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
   const [autoExecute, setAutoExecute] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
+
+  const saved = loadSettings();
+  const [fontFamily, setFontFamily] = useState(saved.fontFamily || 'JetBrains Mono');
+  const [fontSize, setFontSize] = useState(saved.fontSize || 14);
 
   const terminalRefs = useRef({});
   const splitGeminiRef = useRef(null);
+  const settingsRef = useRef(null);
+
+  // Load Google Font on mount and when font changes
+  useEffect(() => {
+    const font = MONO_FONTS.find((f) => f.id === fontFamily);
+    if (font?.google) loadGoogleFont(fontFamily);
+  }, [fontFamily]);
+
+  // Persist settings
+  useEffect(() => {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ fontFamily, fontSize }));
+  }, [fontFamily, fontSize]);
+
+  // Apply CSS variables for Gemini terminal
+  useEffect(() => {
+    document.documentElement.style.setProperty('--terminal-font', `'${fontFamily}', monospace`);
+    document.documentElement.style.setProperty('--terminal-font-size', `${fontSize}px`);
+  }, [fontFamily, fontSize]);
+
+  // Close settings when clicking outside
+  useEffect(() => {
+    if (!showSettings) return;
+    const handleClick = (e) => {
+      if (settingsRef.current && !settingsRef.current.contains(e.target)) {
+        setShowSettings(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showSettings]);
 
   // Shift+Tab to toggle focus between split panels
   useEffect(() => {
@@ -205,6 +271,48 @@ function App() {
             />
             <span className="auto-execute-label">Auto-execute</span>
           </label>
+          <div className="settings-wrapper" ref={settingsRef}>
+            <button
+              className={`settings-gear ${showSettings ? 'settings-gear--active' : ''}`}
+              onClick={() => setShowSettings((prev) => !prev)}
+              title="Settings"
+            >
+              ⚙
+            </button>
+            {showSettings && (
+              <div className="settings-panel">
+                <div className="settings-title">Settings</div>
+                <div className="settings-group">
+                  <label className="settings-label">Font Family</label>
+                  <select
+                    className="settings-select"
+                    value={fontFamily}
+                    onChange={(e) => setFontFamily(e.target.value)}
+                  >
+                    {MONO_FONTS.map((f) => (
+                      <option key={f.id} value={f.id}>{f.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="settings-group">
+                  <label className="settings-label">
+                    Font Size: {fontSize}px
+                  </label>
+                  <input
+                    type="range"
+                    className="settings-range"
+                    min="10"
+                    max="22"
+                    value={fontSize}
+                    onChange={(e) => setFontSize(Number(e.target.value))}
+                  />
+                </div>
+                <div className="settings-preview" style={{ fontFamily: `'${fontFamily}', monospace`, fontSize: `${fontSize}px` }}>
+                  The quick brown fox jumps over the lazy dog
+                </div>
+              </div>
+            )}
+          </div>
           <div className="status-bar">
             <span className={`status-dot ${activeSession?.status || ''}`} />
             <span className="status-text">{displayStatus}</span>
@@ -277,6 +385,8 @@ function App() {
                 isActive={tab.id === activeTab && !showForm}
                 onStatusChange={(status) => handleStatusChange(tab.id, status)}
                 onClose={() => handleCloseTab(tab.id)}
+                fontFamily={fontFamily}
+                fontSize={fontSize}
               />
             ) : (
                 /* In split mode, hide Gemini tabs from the left panel */
