@@ -1130,7 +1130,7 @@
 
 .gemini-term-ascii {
   white-space: pre;
-  font-size: 11px;
+  font-size: calc(var(--terminal-font-size, 14px) - 3px);
   line-height: 1.2;
   background: linear-gradient(135deg, #4285f4, #ea4335, #fbbc04, #34a853);
   -webkit-background-clip: text;
@@ -1224,7 +1224,7 @@
   padding: 1px 6px;
   cursor: pointer;
   transition: all 0.15s;
-  font-family: var(--terminal-font, 'JetBrains Mono', monospace);
+  font-family: inherit;
 }
 
 .gemini-cmd-tag:hover {
@@ -1482,7 +1482,7 @@
 
 .agent-step-icon {
   flex-shrink: 0;
-  font-size: 14px;
+  font-size: inherit;
   line-height: 1.5;
 }
 
@@ -1492,7 +1492,7 @@
 
 .agent-step-reasoning {
   color: var(--text-muted);
-  font-size: calc(var(--terminal-font-size, 14px) - 1px);
+  font-size: inherit;
   font-style: italic;
   line-height: 1.5;
 }
@@ -1503,7 +1503,7 @@
   background: rgba(0, 0, 0, 0.3);
   border-radius: 4px;
   color: #7ee787;
-  font-size: var(--terminal-font-size, 14px);
+  font-size: inherit;
   line-height: 1.5;
 }
 
@@ -1519,7 +1519,7 @@
   background: rgba(0, 0, 0, 0.2);
   border-radius: 4px;
   color: var(--text-secondary);
-  font-size: calc(var(--terminal-font-size, 14px) - 1px);
+  font-size: inherit;
   line-height: 1.4;
   white-space: pre-wrap;
   word-break: break-all;
@@ -1549,7 +1549,7 @@
 
 .agent-step-complete .agent-step-icon {
   color: #7ee787;
-  font-size: 14px;
+  font-size: inherit;
   line-height: 1.5;
 }
 
