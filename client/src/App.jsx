@@ -237,6 +237,15 @@ function App() {
     return termRef.sendAgentKeys(keys);
   }, [activeTab, tabs]);
 
+  const handleAbortAgentCapture = useCallback(() => {
+    const sshTabId = activeTab && tabs.find((t) => t.id === activeTab && t.type === 'ssh')
+      ? activeTab
+      : tabs.find((t) => t.type === 'ssh')?.id;
+    if (!sshTabId) return;
+    const termRef = terminalRefs.current[sshTabId];
+    if (termRef) termRef.abortAgentCapture();
+  }, [activeTab, tabs]);
+
   const getTabLabel = (tab) => {
     if (tab.type === 'gemini') return 'Gemini';
     if (tab.type === 'claude') return 'Claude';
@@ -503,6 +512,7 @@ function App() {
                     agentMode={agentMode}
                     onRunAgentCommand={handleRunAgentCommand}
                     onSendAgentKeys={handleSendAgentKeys}
+                    onAbortAgentCapture={handleAbortAgentCapture}
                 />
               )
             ) : tab.type === 'claude' ? (
@@ -536,6 +546,7 @@ function App() {
                 agentMode={agentMode}
                 onRunAgentCommand={handleRunAgentCommand}
                 onSendAgentKeys={handleSendAgentKeys}
+                onAbortAgentCapture={handleAbortAgentCapture}
               />
             </div>
           </>

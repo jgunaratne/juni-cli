@@ -26,6 +26,7 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
   const fitRef = useRef(null);
   const socketRef = useRef(null);
   const agentCaptureRef = useRef(null); // { buffer, resolve, timer }
+  const agentKeysRef = useRef(null); // { resolve, timer, cleanup }
 
   useImperativeHandle(ref, () => ({
     focus: () => xtermRef.current?.focus(),
@@ -46,6 +47,24 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
     writeToTerminal: (text) => {
       if (socketRef.current) {
         socketRef.current.emit('ssh:data', text);
+      }
+    },
+    abortAgentCapture: () => {
+      // Immediately resolve any pending runAgentCommand
+      if (agentCaptureRef.current) {
+        const { resolve, timer, buffer } = agentCaptureRef.current;
+        clearTimeout(timer);
+        agentCaptureRef.current = null;
+        const raw = stripAnsi(buffer).trim();
+        resolve(raw || '(aborted by user)');
+      }
+      // Immediately resolve any pending sendAgentKeys
+      if (agentKeysRef.current) {
+        const { resolve, timer, cleanup } = agentKeysRef.current;
+        clearTimeout(timer);
+        cleanup();
+        agentKeysRef.current = null;
+        resolve('(aborted by user)');
       }
     },
     sendAgentKeys: (keys) => {
@@ -104,15 +123,22 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
         };
         socketRef.current.on('ssh:output', onOutput);
 
+        const cleanup = () => {
+          socketRef.current?.off('ssh:output', onOutput);
+        };
+
         // Send the keystrokes
         socketRef.current.emit('ssh:data', payload);
 
         // Wait 3 seconds, then return whatever appeared
-        setTimeout(() => {
-          socketRef.current?.off('ssh:output', onOutput);
+        const timer = setTimeout(() => {
+          cleanup();
+          agentKeysRef.current = null;
           const cleaned = stripAnsi(outputBuffer).trim();
           resolve(cleaned || '(no visible output after sending keys)');
         }, 3000);
+
+        agentKeysRef.current = { resolve, timer, cleanup };
       });
     },
     runAgentCommand: (command) => {

@@ -40,11 +40,12 @@ async function callGemini(model, messages) {
   return data.reply ?? 'No response generated.';
 }
 
-async function callGeminiAgent(model, history) {
+async function callGeminiAgent(model, history, signal) {
   const res = await fetch(`${SERVER_URL}/api/gemini/agent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ model, history }),
+    signal,
   });
 
   if (!res.ok) {
@@ -79,6 +80,7 @@ const GeminiChat = forwardRef(function GeminiChat({
   agentMode = false,
   onRunAgentCommand,
   onSendAgentKeys,
+  onAbortAgentCapture,
 }, ref) {
   const pastedTextRef = useRef(null);
   const autoSendRef = useRef(false);
@@ -107,6 +109,7 @@ const GeminiChat = forwardRef(function GeminiChat({
   const [agentPaused, setAgentPaused] = useState(false);
   const [agentStopping, setAgentStopping] = useState(false);
   const abortAgentRef = useRef(false);
+  const abortControllerRef = useRef(null); // AbortController for in-flight API requests
   const pausedResolverRef = useRef(null); // resolver fn to resume from pause
   const lastAgentPromptRef = useRef(null); // stores last agent prompt for retry
 
@@ -145,8 +148,8 @@ const GeminiChat = forwardRef(function GeminiChat({
 
   /* ── Agent loop ──────────────────────────────────────── */
 
-  const runAgentStep = useCallback(async (history) => {
-    const parts = await callGeminiAgent(model, history);
+  const runAgentStep = useCallback(async (history, signal) => {
+    const parts = await callGeminiAgent(model, history, signal);
 
     // Check for function calls
     const functionCall = parts.find((p) => p.functionCall);
@@ -271,6 +274,10 @@ const GeminiChat = forwardRef(function GeminiChat({
     setAgentSteps([]);
     setPendingCommand(null);
 
+    // Create a new AbortController for this run
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     // Start with user message
     const userEntry = { role: 'user', parts: [{ text: userText }] };
     let history = [...agentHistory, userEntry];
@@ -300,7 +307,7 @@ const GeminiChat = forwardRef(function GeminiChat({
         }
 
         setIsLoading(true);
-        const result = await runAgentStep(history);
+        const result = await runAgentStep(history, controller.signal);
         setIsLoading(false);
 
         if (result.type === 'text') {
@@ -342,16 +349,22 @@ const GeminiChat = forwardRef(function GeminiChat({
       }
     } catch (err) {
       setIsLoading(false);
-      setAgentSteps((prev) => [...prev, {
-        type: 'error',
-        text: err instanceof Error ? err.message : 'Agent error',
-        status: 'done',
-      }]);
+      // Don't show abort errors as real errors
+      if (err?.name === 'AbortError') {
+        setAgentSteps((prev) => [...prev, { type: 'aborted', status: 'done' }]);
+      } else {
+        setAgentSteps((prev) => [...prev, {
+          type: 'error',
+          text: err instanceof Error ? err.message : 'Agent error',
+          status: 'done',
+        }]);
+      }
     } finally {
       setAgentRunning(false);
       setAgentPaused(false);
       setAgentStopping(false);
       pausedResolverRef.current = null;
+      abortControllerRef.current = null;
       setIsLoading(false);
       requestAnimationFrame(() => inputRef.current?.focus());
     }
@@ -360,13 +373,20 @@ const GeminiChat = forwardRef(function GeminiChat({
   const stopAgent = useCallback(() => {
     abortAgentRef.current = true;
     setAgentStopping(true);
+    // Abort any in-flight API request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    // Immediately resolve any pending terminal capture
+    onAbortAgentCapture?.();
     // If paused, resolve the pause promise so the loop can exit
     if (typeof pausedResolverRef.current === 'function') {
       pausedResolverRef.current();
       pausedResolverRef.current = null;
     }
     setAgentPaused(false);
-  }, []);
+  }, [onAbortAgentCapture]);
 
   const pauseAgent = useCallback(() => {
     if (agentRunning && !agentPaused) {
