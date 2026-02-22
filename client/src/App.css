@@ -1146,7 +1146,6 @@
 
 .gemini-term-label {
   color: #fbbc04;
-  font-weight: 500;
 }
 
 .gemini-term-hint {
@@ -1188,16 +1187,12 @@
 
 .gemini-term-prompt-symbol {
   color: #56d364;
-  font-family: inherit;
-    font-size: inherit;
-  font-weight: 600;
   flex-shrink: 0;
   user-select: none;
 }
 
 .gemini-term-prompt-text {
   color: #f0f6fc;
-  font-weight: 500;
 }
 
 .gemini-term-line--model {
@@ -1243,7 +1238,6 @@
 
 .gemini-term-error {
   color: #ff7b72;
-  font-weight: 500;
 }
 
 .gemini-term-line--system {
@@ -1474,26 +1468,7 @@
 }
 
 .agent-step-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-
-.agent-step-icon {
-  flex-shrink: 0;
-  font-size: inherit;
-  line-height: 1.5;
-}
-
-.agent-step--command .agent-step-icon {
-  color: #f0a050;
-}
-
-.agent-step-reasoning {
   color: var(--text-muted);
-  font-size: inherit;
-  font-style: italic;
   line-height: 1.5;
 }
 
@@ -1505,12 +1480,6 @@
   color: #7ee787;
   font-size: inherit;
   line-height: 1.5;
-}
-
-.agent-cmd-prefix {
-  color: var(--text-muted);
-  margin-right: 6px;
-  user-select: none;
 }
 
 .agent-step-output {
@@ -1542,21 +1511,11 @@
 }
 
 .agent-step-complete {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.agent-step-complete .agent-step-icon {
-  color: #7ee787;
-  font-size: inherit;
-  line-height: 1.5;
-}
-
-.agent-step-summary {
   color: #7ee787;
   line-height: 1.5;
 }
+
+
 
 .agent-step--aborted {
   background: rgba(255, 123, 114, 0.06);
@@ -1565,13 +1524,7 @@
 }
 
 .agent-step-aborted {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.agent-step-aborted .agent-step-icon {
-  color: #ff7b72;
+  color: var(--text-muted);
 }
 
 .agent-step--error {
@@ -1580,13 +1533,5 @@
 }
 
 .agent-step-error {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
   color: #ff7b72;
-}
-
-.agent-step-error .agent-step-icon {
-  color: #ff7b72;
-  line-height: 1.5;
 }

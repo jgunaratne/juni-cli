@@ -502,18 +502,15 @@ const GeminiChat = forwardRef(function GeminiChat({
             {step.type === 'command' && (
               <>
                 <div className="agent-step-header">
-                  <span className="agent-step-icon">
-                    {step.status === 'running' ? '⟳' : '✓'}
-                  </span>
-                  <span className="agent-step-reasoning">{step.reasoning}</span>
+                  [{step.status === 'running' ? 'running' : 'done'}] {step.reasoning}
                 </div>
                 <div className="agent-step-command">
-                  <span className="agent-cmd-prefix">$</span> {step.command}
+                  {'> '}{step.command}
                 </div>
                 {step.output && (
                   <pre className="agent-step-output">
                     {step.output.length > 2000
-                      ? step.output.substring(0, 2000) + '\n… (truncated)'
+                      ? step.output.substring(0, 2000) + '\n(truncated)'
                       : step.output}
                   </pre>
                 )}
@@ -521,20 +518,17 @@ const GeminiChat = forwardRef(function GeminiChat({
             )}
             {step.type === 'complete' && (
               <div className="agent-step-complete">
-                <span className="agent-step-icon">✦</span>
-                <span className="agent-step-summary">{step.summary}</span>
+                [complete] {step.summary}
               </div>
             )}
             {step.type === 'aborted' && (
               <div className="agent-step-aborted">
-                <span className="agent-step-icon">■</span>
-                <span>Agent stopped by user.</span>
+                [stopped] agent stopped by user.
               </div>
             )}
             {step.type === 'error' && (
               <div className="agent-step-error">
-                <span className="agent-step-icon">✕</span>
-                <span>Error: {step.text}</span>
+                [error] {step.text}
               </div>
             )}
           </div>
