@@ -1075,7 +1075,7 @@
 .terminal-viewport {
   flex: 1;
   min-height: 0;
-  padding: 16px;
+  padding: 16px 16px 24px;
     background: var(--terminal-bg, #0d1117);
   overflow: hidden;
 }
