@@ -104,6 +104,118 @@ app.post('/api/gemini/chat', async (req, res) => {
   }
 });
 
+/* ── Gemini Agent Endpoint (Function Calling) ─────────────── */
+
+const AGENT_TOOLS = [
+  {
+    functionDeclarations: [
+      {
+        name: 'run_command',
+        description:
+          'Execute a shell command on the user\'s remote SSH terminal. ' +
+          'Use this to run any Linux/macOS command. The output of the command will be returned to you. ' +
+          'Run one command at a time. For multi-step tasks, run commands sequentially and inspect output between each.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            command: {
+              type: 'STRING',
+              description: 'The shell command to execute',
+            },
+            reasoning: {
+              type: 'STRING',
+              description: 'Brief explanation of why you are running this command',
+            },
+          },
+          required: ['command', 'reasoning'],
+        },
+      },
+      {
+        name: 'task_complete',
+        description:
+          'Signal that the task is finished. Call this when you have completed the user\'s request or determined it cannot be completed.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            summary: {
+              type: 'STRING',
+              description: 'A concise summary of what was accomplished',
+            },
+          },
+          required: ['summary'],
+        },
+      },
+    ],
+  },
+];
+
+const AGENT_SYSTEM_PROMPT =
+  'You are an expert Linux/macOS system administrator agent with full access to the user\'s terminal via SSH. ' +
+  'When the user asks you to do something, use the run_command tool to execute commands on their terminal. ' +
+  'Inspect the output of each command before deciding the next step. ' +
+  'Break complex tasks into small, sequential steps. ' +
+  'If a command fails, analyze the error and try to fix it. ' +
+  'When the task is complete, call task_complete with a summary. ' +
+  'If the user asks a question that does not require running commands, respond with plain text. ' +
+  'Never run destructive commands (rm -rf /, mkfs, etc.) without the user explicitly confirming.';
+
+app.post('/api/gemini/agent', async (req, res) => {
+  try {
+    const {
+      model = 'gemini-3-flash-preview',
+      history = [],
+      project,
+      location,
+    } = req.body;
+
+    const resolvedProject = project || DEFAULT_PROJECT;
+    const resolvedLocation = location || DEFAULT_LOCATION;
+
+    if (!resolvedProject) {
+      return res.status(400).json({
+        error: 'GCP project ID is required. Set GCP_PROJECT_ID in server/.env.',
+      });
+    }
+
+    // Build contents from history
+    // Each entry is { role: 'user'|'model', parts: [...] }
+    // Parts can be: { text }, { functionCall: { name, args } }, { functionResponse: { name, response } }
+    const contents = history.map((entry) => ({
+      role: entry.role,
+      parts: entry.parts,
+    }));
+
+    if (contents.length === 0) {
+      return res.status(400).json({ error: 'history is required' });
+    }
+
+    const vertexAI = getVertexClient(resolvedProject, resolvedLocation);
+    const generativeModel = vertexAI.getGenerativeModel({
+      model,
+      systemInstruction: AGENT_SYSTEM_PROMPT,
+      tools: AGENT_TOOLS,
+      generationConfig: {
+        temperature: 0.3,
+        maxOutputTokens: 4096,
+      },
+    });
+
+    const result = await generativeModel.generateContent({ contents });
+    const response = result.response;
+    const candidate = response?.candidates?.[0];
+
+    if (!candidate?.content?.parts) {
+      return res.json({ parts: [{ text: 'No response generated.' }] });
+    }
+
+    res.json({ parts: candidate.content.parts });
+  } catch (err) {
+    console.error('[gemini-agent] Error:', err);
+    const message = err instanceof Error ? err.message : 'Internal server error';
+    res.status(500).json({ error: message });
+  }
+});
+
 /* ── Claude Chat Endpoint ──────────────────────────────────── */
 
 app.post('/api/claude/chat', async (req, res) => {

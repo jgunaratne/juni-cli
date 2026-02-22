@@ -39,6 +39,22 @@ async function callGemini(model, messages) {
   return data.reply ?? 'No response generated.';
 }
 
+async function callGeminiAgent(model, history) {
+  const res = await fetch(`${SERVER_URL}/api/gemini/agent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model, history }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error || `HTTP ${res.status}`);
+  }
+
+  const data = await res.json();
+  return data.parts ?? [{ text: 'No response generated.' }];
+}
+
 /* ── Simple markdown → ANSI-style terminal rendering ── */
 
 function renderForTerminal(text) {
@@ -54,8 +70,16 @@ function renderForTerminal(text) {
 
 /* ── Component ────────────────────────────────────────── */
 
-const GeminiChat = forwardRef(function GeminiChat({ model = 'gemini-3-flash-preview', isActive, onStatusChange, onRunCommand }, ref) {
+const GeminiChat = forwardRef(function GeminiChat({
+  model = 'gemini-3-flash-preview',
+  isActive,
+  onStatusChange,
+  onRunCommand,
+  agentMode = false,
+  onRunAgentCommand,
+}, ref) {
   const pastedTextRef = useRef(null);
+  const autoSendRef = useRef(false);
 
   useImperativeHandle(ref, () => ({
     focus: () => inputRef.current?.focus(),
@@ -63,7 +87,7 @@ const GeminiChat = forwardRef(function GeminiChat({ model = 'gemini-3-flash-prev
       const lineCount = text.split('\n').length;
       pastedTextRef.current = text;
       setInput(`[Terminal text — ${lineCount} line${lineCount !== 1 ? 's' : ''}]`);
-      requestAnimationFrame(() => inputRef.current?.focus());
+      autoSendRef.current = true;
     },
   }));
 
@@ -72,6 +96,14 @@ const GeminiChat = forwardRef(function GeminiChat({ model = 'gemini-3-flash-prev
   const [isLoading, setIsLoading] = useState(false);
   const [commandHistory, setCommandHistory] = useState(loadCmdHistory);
   const [historyIndex, setHistoryIndex] = useState(-1);
+
+  // Agent-specific state
+  const [agentHistory, setAgentHistory] = useState([]); // Vertex AI conversation history
+  const [agentSteps, setAgentSteps] = useState([]); // { type, command?, reasoning?, output?, summary?, status }
+  const [pendingCommand, setPendingCommand] = useState(null); // { command, reasoning } awaiting confirmation
+  const [agentRunning, setAgentRunning] = useState(false);
+  const abortAgentRef = useRef(false);
+
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -79,6 +111,14 @@ const GeminiChat = forwardRef(function GeminiChat({ model = 'gemini-3-flash-prev
   useEffect(() => {
     onStatusChange('ready');
   }, [onStatusChange]);
+
+  // Auto-send when text is pasted via "Send to Gemini"
+  useEffect(() => {
+    if (autoSendRef.current && input) {
+      autoSendRef.current = false;
+      handleSend();
+    }
+  }, [input, handleSend]);
 
   // Persist chat history to localStorage
   useEffect(() => {
@@ -90,12 +130,12 @@ const GeminiChat = forwardRef(function GeminiChat({ model = 'gemini-3-flash-prev
     localStorage.setItem(CMD_HISTORY_KEY, JSON.stringify(commandHistory));
   }, [commandHistory]);
 
-  // Auto-scroll when new messages arrive or user is typing
+  // Auto-scroll when new messages arrive or agent steps change
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, input]);
+  }, [messages, input, agentSteps, pendingCommand]);
 
   // Focus input when tab becomes active
   useEffect(() => {
@@ -104,14 +144,154 @@ const GeminiChat = forwardRef(function GeminiChat({ model = 'gemini-3-flash-prev
     }
   }, [isActive]);
 
+  /* ── Agent loop ──────────────────────────────────────── */
+
+  const runAgentStep = useCallback(async (history) => {
+    const parts = await callGeminiAgent(model, history);
+
+    // Check for function calls
+    const functionCall = parts.find((p) => p.functionCall);
+    const textPart = parts.find((p) => p.text);
+
+    if (functionCall) {
+      const { name, args } = functionCall.functionCall;
+
+      if (name === 'task_complete') {
+        return { type: 'complete', summary: args.summary, parts };
+      }
+
+      if (name === 'run_command') {
+        return { type: 'command', command: args.command, reasoning: args.reasoning, parts };
+      }
+    }
+
+    // Plain text response (no tool call)
+    if (textPart) {
+      return { type: 'text', text: textPart.text, parts };
+    }
+
+    return { type: 'text', text: 'No response generated.', parts: [{ text: 'No response generated.' }] };
+  }, [model]);
+
+  const executeAgentCommand = useCallback(async (command, reasoning, currentHistory) => {
+    // Add the step to UI
+    setAgentSteps((prev) => [...prev, {
+      type: 'command',
+      command,
+      reasoning,
+      status: 'running',
+    }]);
+
+    // Execute the command via the terminal
+    let output = '';
+    if (onRunAgentCommand) {
+      output = await onRunAgentCommand(command);
+    } else {
+      output = '(No terminal connected for agent execution)';
+    }
+
+    // Update step with output
+    setAgentSteps((prev) => prev.map((s, i) =>
+      i === prev.length - 1 ? { ...s, output, status: 'done' } : s
+    ));
+
+    // Build new history with function call and response
+    const modelEntry = {
+      role: 'model',
+      parts: [{ functionCall: { name: 'run_command', args: { command, reasoning } } }],
+    };
+    const functionResponseEntry = {
+      role: 'user',
+      parts: [{ functionResponse: { name: 'run_command', response: { output } } }],
+    };
+
+    return [...currentHistory, modelEntry, functionResponseEntry];
+  }, [onRunAgentCommand]);
+
+  const startAgentLoop = useCallback(async (userText) => {
+    abortAgentRef.current = false;
+    setAgentRunning(true);
+    setAgentSteps([]);
+    setPendingCommand(null);
+
+    // Start with user message
+    const userEntry = { role: 'user', parts: [{ text: userText }] };
+    let history = [...agentHistory, userEntry];
+    setAgentHistory(history);
+
+    const maxIterations = 20;
+
+    try {
+      for (let i = 0; i < maxIterations; i++) {
+        if (abortAgentRef.current) {
+          setAgentSteps((prev) => [...prev, { type: 'aborted', status: 'done' }]);
+          break;
+        }
+
+        setIsLoading(true);
+        const result = await runAgentStep(history);
+        setIsLoading(false);
+
+        if (result.type === 'text') {
+          // Model responded with text, not a tool call
+          const modelEntry = { role: 'model', parts: result.parts };
+          history = [...history, modelEntry];
+          setAgentHistory(history);
+          setMessages((prev) => [...prev, { type: 'model', text: renderForTerminal(result.text) }]);
+          break;
+        }
+
+        if (result.type === 'complete') {
+          const modelEntry = { role: 'model', parts: result.parts };
+          history = [...history, modelEntry];
+          setAgentHistory(history);
+          setAgentSteps((prev) => [...prev, { type: 'complete', summary: result.summary, status: 'done' }]);
+
+          // Send back function response to close the loop
+          const functionResponseEntry = {
+            role: 'user',
+            parts: [{ functionResponse: { name: 'task_complete', response: { acknowledged: true } } }],
+          };
+          history = [...history, functionResponseEntry];
+          setAgentHistory(history);
+          break;
+        }
+
+        if (result.type === 'command') {
+          // Execute the command
+          history = await executeAgentCommand(result.command, result.reasoning, history);
+          setAgentHistory(history);
+        }
+      }
+    } catch (err) {
+      setIsLoading(false);
+      setAgentSteps((prev) => [...prev, {
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Agent error',
+        status: 'done',
+      }]);
+    } finally {
+      setAgentRunning(false);
+      setIsLoading(false);
+    }
+  }, [agentHistory, runAgentStep, executeAgentCommand]);
+
+  const stopAgent = useCallback(() => {
+    abortAgentRef.current = true;
+  }, []);
+
+  /* ── Regular chat send ───────────────────────────────── */
+
   const handleSend = useCallback(async () => {
     const text = input.trim();
-    if (!text || isLoading) return;
+    if (!text || isLoading || agentRunning) return;
 
     // Handle special commands
     if (text === 'clear') {
       setMessages([]);
       setCommandHistory([]);
+      setAgentHistory([]);
+      setAgentSteps([]);
       setInput('');
       return;
     }
@@ -124,7 +304,11 @@ const GeminiChat = forwardRef(function GeminiChat({ model = 'gemini-3-flash-prev
         { type: 'system', text: '  help      — Show this help message' },
         { type: 'system', text: '  model     — Show current model info' },
         { type: 'system', text: '' },
-        { type: 'system', text: 'Type any message to chat with Gemini.' },
+        {
+          type: 'system', text: agentMode
+            ? 'Agent mode ON — commands will be auto-executed on your terminal.'
+            : 'Type any message to chat with Gemini.'
+        },
       ]);
       setInput('');
       return;
@@ -134,6 +318,7 @@ const GeminiChat = forwardRef(function GeminiChat({ model = 'gemini-3-flash-prev
       setMessages((prev) => [
         ...prev,
         { type: 'system', text: `Model: ${model} (via Vertex AI)` },
+        { type: 'system', text: `Agent mode: ${agentMode ? 'ON' : 'OFF'}` },
       ]);
       setInput('');
       return;
@@ -143,7 +328,6 @@ const GeminiChat = forwardRef(function GeminiChat({ model = 'gemini-3-flash-prev
     setCommandHistory((prev) => [text, ...prev].slice(0, 50));
     setHistoryIndex(-1);
 
-    // If this was pasted terminal text, use full text for API but compact display
     const fullText = pastedTextRef.current ?? text;
     const displayText = pastedTextRef.current ? text : undefined;
     pastedTextRef.current = null;
@@ -151,10 +335,17 @@ const GeminiChat = forwardRef(function GeminiChat({ model = 'gemini-3-flash-prev
     const userEntry = { type: 'user', text: fullText, ...(displayText && { displayText }) };
     setMessages((prev) => [...prev, userEntry]);
     setInput('');
+
+    if (agentMode) {
+      // Use the agent loop
+      await startAgentLoop(fullText);
+      return;
+    }
+
+    // Regular chat mode
     setIsLoading(true);
 
     try {
-      // Build message history for API (only user/model messages)
       const apiMessages = [...messages, userEntry]
         .filter((m) => m.type === 'user' || m.type === 'model')
         .map((m) => ({ role: m.type === 'user' ? 'user' : 'model', text: m.text }));
@@ -170,7 +361,7 @@ const GeminiChat = forwardRef(function GeminiChat({ model = 'gemini-3-flash-prev
       setIsLoading(false);
       inputRef.current?.focus();
     }
-  }, [input, isLoading, messages, model]);
+  }, [input, isLoading, agentRunning, messages, model, agentMode, startAgentLoop]);
 
   const handleKeyDown = useCallback(
     (e) => {
@@ -180,7 +371,6 @@ const GeminiChat = forwardRef(function GeminiChat({ model = 'gemini-3-flash-prev
         return;
       }
 
-      // Arrow up/down for command history
       if (e.key === 'ArrowUp') {
         e.preventDefault();
         if (commandHistory.length > 0) {
@@ -208,6 +398,8 @@ const GeminiChat = forwardRef(function GeminiChat({ model = 'gemini-3-flash-prev
   const handleClear = useCallback(() => {
     setMessages([]);
     setCommandHistory([]);
+    setAgentHistory([]);
+    setAgentSteps([]);
   }, []);
 
   return (
@@ -219,10 +411,18 @@ const GeminiChat = forwardRef(function GeminiChat({ model = 'gemini-3-flash-prev
         <div className="toolbar-left">
           <span className="gemini-toolbar-icon">✦</span>
           <span className="terminal-title">gemini — Vertex AI</span>
+          {agentMode && <span className="agent-mode-badge">AGENT</span>}
         </div>
-        <button className="disconnect-btn" onClick={handleClear}>
-          ⌫ Clear
-        </button>
+        <div className="toolbar-right-group">
+          {agentRunning && (
+            <button className="disconnect-btn agent-stop-btn" onClick={stopAgent}>
+              ■ Stop
+            </button>
+          )}
+          <button className="disconnect-btn" onClick={handleClear}>
+            ⌫ Clear
+          </button>
+        </div>
       </div>
 
       <div
@@ -236,13 +436,17 @@ const GeminiChat = forwardRef(function GeminiChat({ model = 'gemini-3-flash-prev
         }}
       >
         {/* Welcome banner */}
-        {messages.length === 0 && !isLoading && (
+        {messages.length === 0 && agentSteps.length === 0 && !isLoading && (
           <div className="gemini-term-welcome">
             <div className="gemini-term-info">
               <span className="gemini-term-label">{model}</span> via Vertex AI
+              {agentMode && <span className="agent-welcome-badge">Agent Mode</span>}
             </div>
             <div className="gemini-term-hint">
-              Type a message to chat, or <span className="gemini-term-cmd">help</span> for commands.
+              {agentMode
+                ? <>Ask me to do something on your terminal.  e.g. <span className="gemini-term-cmd">install htop and check system load</span></>
+                : <>Type a message to chat, or <span className="gemini-term-cmd">help</span> for commands.</>
+              }
             </div>
           </div>
         )}
@@ -252,7 +456,9 @@ const GeminiChat = forwardRef(function GeminiChat({ model = 'gemini-3-flash-prev
           <div key={i} className={`gemini-term-line gemini-term-line--${entry.type}`}>
             {entry.type === 'user' && (
               <>
-                <span className="gemini-term-prompt-symbol">gemini:/&gt;</span>
+                <span className="gemini-term-prompt-symbol">
+                  {agentMode ? 'agent:/>' : 'gemini:/>'}
+                </span>
                 <span className="gemini-term-prompt-text">{entry.displayText ?? entry.text}</span>
               </>
             )}
@@ -289,21 +495,69 @@ const GeminiChat = forwardRef(function GeminiChat({ model = 'gemini-3-flash-prev
           </div>
         ))}
 
+        {/* Agent steps */}
+        {agentSteps.map((step, i) => (
+          <div key={`agent-${i}`} className={`agent-step agent-step--${step.type}`}>
+            {step.type === 'command' && (
+              <>
+                <div className="agent-step-header">
+                  <span className="agent-step-icon">
+                    {step.status === 'running' ? '⟳' : '✓'}
+                  </span>
+                  <span className="agent-step-reasoning">{step.reasoning}</span>
+                </div>
+                <div className="agent-step-command">
+                  <span className="agent-cmd-prefix">$</span> {step.command}
+                </div>
+                {step.output && (
+                  <pre className="agent-step-output">
+                    {step.output.length > 2000
+                      ? step.output.substring(0, 2000) + '\n… (truncated)'
+                      : step.output}
+                  </pre>
+                )}
+              </>
+            )}
+            {step.type === 'complete' && (
+              <div className="agent-step-complete">
+                <span className="agent-step-icon">✦</span>
+                <span className="agent-step-summary">{step.summary}</span>
+              </div>
+            )}
+            {step.type === 'aborted' && (
+              <div className="agent-step-aborted">
+                <span className="agent-step-icon">■</span>
+                <span>Agent stopped by user.</span>
+              </div>
+            )}
+            {step.type === 'error' && (
+              <div className="agent-step-error">
+                <span className="agent-step-icon">✕</span>
+                <span>Error: {step.text}</span>
+              </div>
+            )}
+          </div>
+        ))}
+
         {/* Loading indicator */}
         {isLoading && (
           <div className="gemini-term-line gemini-term-line--loading">
             <span className="gemini-term-spinner" />
-            <span className="gemini-term-loading-text">thinking…</span>
+            <span className="gemini-term-loading-text">
+              {agentRunning ? 'agent thinking…' : 'thinking…'}
+            </span>
           </div>
         )}
 
         {/* Input line */}
-        {!isLoading && (
+        {!isLoading && !agentRunning && (
           <div
             className="gemini-term-input-line"
             onClick={() => inputRef.current?.focus()}
           >
-            <span className="gemini-term-prompt-symbol">gemini:/&gt;</span>
+            <span className="gemini-term-prompt-symbol">
+              {agentMode ? 'agent:/>' : 'gemini:/>'}
+            </span>
             <div className="gemini-term-input-wrapper">
               <span className="gemini-term-input-display">{input}</span>
               <span className="gemini-term-cursor" />

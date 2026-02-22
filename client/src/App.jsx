@@ -54,6 +54,7 @@ function App() {
   const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
   const [autoExecute, setAutoExecute] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
+  const [agentMode, setAgentMode] = useState(false);
 
   const saved = loadSettings();
   const [fontFamily, setFontFamily] = useState(saved.fontFamily || 'JetBrains Mono');
@@ -211,6 +212,16 @@ function App() {
     termRef.focus();
   }, [activeTab, tabs, autoExecute]);
 
+  const handleRunAgentCommand = useCallback(async (command) => {
+    const sshTabId = activeTab && tabs.find((t) => t.id === activeTab && t.type === 'ssh')
+      ? activeTab
+      : tabs.find((t) => t.type === 'ssh')?.id;
+    if (!sshTabId) return '(No SSH terminal connected)';
+    const termRef = terminalRefs.current[sshTabId];
+    if (!termRef) return '(Terminal ref not found)';
+    return termRef.runAgentCommand(command);
+  }, [activeTab, tabs]);
+
   const getTabLabel = (tab) => {
     if (tab.type === 'gemini') return 'Gemini';
     if (tab.type === 'claude') return 'Claude';
@@ -282,6 +293,14 @@ function App() {
             />
             <span className="auto-execute-label">Auto-execute</span>
           </label>
+          <button
+            className={`agent-toggle ${agentMode ? 'agent-toggle--active' : ''}`}
+            onClick={() => setAgentMode((prev) => !prev)}
+            title={agentMode ? 'Disable agent mode' : 'Enable agent mode: Gemini can execute commands autonomously'}
+          >
+            <span className="agent-toggle-icon">⚡</span>
+            {agentMode ? 'Agent ON' : 'Agent'}
+          </button>
           <div className="settings-wrapper" ref={settingsRef}>
             <button
               className={`settings-gear ${showSettings ? 'settings-gear--active' : ''}`}
@@ -427,6 +446,8 @@ function App() {
                   onStatusChange={(status) => handleStatusChange(tab.id, status)}
                   onClose={() => handleCloseTab(tab.id)}
                   onRunCommand={handleRunCommand}
+                    agentMode={agentMode}
+                    onRunAgentCommand={handleRunAgentCommand}
                 />
               )
             ) : tab.type === 'claude' ? (
@@ -456,6 +477,8 @@ function App() {
                 onStatusChange={(status) => setSplitGeminiStatus(status)}
                 onClose={() => setSplitMode(false)}
                 onRunCommand={handleRunCommand}
+                agentMode={agentMode}
+                onRunAgentCommand={handleRunAgentCommand}
               />
             </div>
           </>

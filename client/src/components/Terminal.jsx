@@ -6,7 +6,15 @@ import '@xterm/xterm/css/xterm.css';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || window.location.origin;
 
+const AGENT_SENTINEL = '__JUNI_AGENT_DONE__';
+
 const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onStatusChange, onClose, fontFamily, fontSize }, ref) {
+  const termRef = useRef(null);
+  const xtermRef = useRef(null);
+  const fitRef = useRef(null);
+  const socketRef = useRef(null);
+  const agentCaptureRef = useRef(null); // { buffer, resolve, timer }
+
   useImperativeHandle(ref, () => ({
     focus: () => xtermRef.current?.focus(),
     getBufferText: () => {
@@ -18,7 +26,6 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
         const line = buf.getLine(i)?.translateToString(true) ?? '';
         lines.push(line);
       }
-      // Trim trailing empty lines
       while (lines.length > 0 && lines[lines.length - 1].trim() === '') {
         lines.pop();
       }
@@ -29,12 +36,26 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
         socketRef.current.emit('ssh:data', text);
       }
     },
+    runAgentCommand: (command) => {
+      return new Promise((resolve) => {
+        if (!socketRef.current) {
+          resolve('Error: terminal not connected');
+          return;
+        }
+        // Set up capture
+        const timer = setTimeout(() => {
+          if (agentCaptureRef.current) {
+            const output = agentCaptureRef.current.buffer;
+            agentCaptureRef.current = null;
+            resolve(output || '(command timed out after 30s)');
+          }
+        }, 30000);
+        agentCaptureRef.current = { buffer: '', resolve, timer };
+        // Send the command with sentinel
+        socketRef.current.emit('ssh:data', `${command}; echo ${AGENT_SENTINEL}\n`);
+      });
+    },
   }));
-
-  const termRef = useRef(null);
-  const xtermRef = useRef(null);
-  const fitRef = useRef(null);
-  const socketRef = useRef(null);
 
   // Re-fit when tab becomes active (container goes from display:none → flex)
   useEffect(() => {
@@ -139,6 +160,21 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
 
     socket.on('ssh:output', (data) => {
       term.write(data);
+      // Agent sentinel watcher
+      if (agentCaptureRef.current) {
+        agentCaptureRef.current.buffer += data;
+        if (agentCaptureRef.current.buffer.includes(AGENT_SENTINEL)) {
+          const { buffer, resolve, timer } = agentCaptureRef.current;
+          clearTimeout(timer);
+          agentCaptureRef.current = null;
+          // Extract output before the sentinel, strip ANSI and clean up
+          const idx = buffer.indexOf(AGENT_SENTINEL);
+          const output = buffer.substring(0, idx)
+            .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '') // strip ANSI escapes
+            .trim();
+          resolve(output);
+        }
+      }
     });
 
     socket.on('ssh:status', ({ status }) => {
