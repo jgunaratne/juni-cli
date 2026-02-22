@@ -204,6 +204,7 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
       onStatusChange(status);
       if (status === 'ready') {
         safeFit();
+        term.focus();
       }
       if (status === 'disconnected') {
         term.writeln('\r\n\x1b[1;31mConnection closed.\x1b[0m');
