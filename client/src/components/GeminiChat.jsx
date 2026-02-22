@@ -235,7 +235,10 @@ const GeminiChat = forwardRef(function GeminiChat({ model = 'gemini-3-flash-prev
                         key={j}
                         className="gemini-cmd-tag"
                         title={`Click to run: ${cmd}`}
-                        onClick={() => onRunCommand?.(cmd)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRunCommand?.(cmd);
+                        }}
                       >
                         {cmd}
                       </span>

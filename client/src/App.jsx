@@ -19,8 +19,8 @@ function App() {
   const [splitMode, setSplitMode] = useState(false);
   const [splitGeminiStatus, setSplitGeminiStatus] = useState('connecting');
   const [splitFocus, setSplitFocus] = useState('left'); // 'left' or 'right'
-  const [selectedModel, setSelectedModel] = useState('gemini-3-flash-preview');
-  const [autoExecute, setAutoExecute] = useState(false);
+  const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
+  const [autoExecute, setAutoExecute] = useState(true);
 
   const terminalRefs = useRef({});
   const splitGeminiRef = useRef(null);

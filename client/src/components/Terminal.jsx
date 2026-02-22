@@ -161,8 +161,25 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
       socket.emit('ssh:resize', { cols, rows });
     });
 
+    // Click-to-paste: clicking on selected text sends it as input
+    let pendingSelection = '';
+    const handleMouseDown = () => {
+      pendingSelection = term.getSelection();
+    };
+    const handleClick = () => {
+      if (pendingSelection && !term.getSelection()) {
+        socket.emit('ssh:data', pendingSelection);
+      }
+      pendingSelection = '';
+    };
+    const el = termRef.current;
+    el.addEventListener('mousedown', handleMouseDown);
+    el.addEventListener('click', handleClick);
+
     // ── Cleanup ───────────────────────────────────────────────
     return () => {
+      el.removeEventListener('mousedown', handleMouseDown);
+      el.removeEventListener('click', handleClick);
       resizeObserver.disconnect();
       socket.disconnect();
       term.dispose();

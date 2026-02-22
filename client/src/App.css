@@ -135,7 +135,7 @@
 .auto-execute-toggle {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   height: 30px;
   padding: 0 10px;
   background: rgba(255, 255, 255, 0.04);
@@ -151,11 +151,37 @@
 }
 
 .auto-execute-toggle input[type="checkbox"] {
-  accent-color: var(--green);
-  width: 14px;
+  appearance: none;
+    -webkit-appearance: none;
+    width: 28px;
   height: 14px;
+  background: rgba(255, 255, 255, 0.1);
+    border-radius: 7px;
+    position: relative;
   cursor: pointer;
   margin: 0;
+  transition: background 0.2s;
+  }
+  
+  .auto-execute-toggle input[type="checkbox"]::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #484f58;
+    transition: all 0.2s;
+  }
+  
+  .auto-execute-toggle input[type="checkbox"]:checked {
+    background: rgba(126, 231, 135, 0.3);
+  }
+  
+  .auto-execute-toggle input[type="checkbox"]:checked::after {
+    left: 16px;
+    background: var(--green);
 }
 
 .auto-execute-label {
