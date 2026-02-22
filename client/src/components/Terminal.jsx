@@ -145,8 +145,8 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
 
     resizeObserver.observe(termRef.current);
 
-    // Initial fit
-    setTimeout(safeFit, 100);
+    // Initial fits — staggered to catch late layout changes
+    const initTimers = [100, 300, 600].map((ms) => setTimeout(safeFit, ms));
 
     xtermRef.current = term;
     fitRef.current = fit;
@@ -161,8 +161,7 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
 
     socket.on('connect', () => {
       socket.emit('ssh:connect', connection);
-      const { cols, rows } = term;
-      socket.emit('ssh:resize', { cols, rows });
+      safeFit();
     });
 
     socket.on('ssh:output', (data) => {
@@ -244,6 +243,7 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
     return () => {
       el.removeEventListener('mousedown', handleMouseDown);
       selDisposable.dispose();
+      initTimers.forEach(clearTimeout);
       clearTimeout(resizeTimer);
       resizeObserver.disconnect();
       socket.disconnect();
