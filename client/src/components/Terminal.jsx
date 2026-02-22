@@ -8,6 +8,17 @@ const SERVER_URL = import.meta.env.VITE_SERVER_URL || window.location.origin;
 
 const AGENT_SENTINEL = '__JUNI_AGENT_DONE__';
 
+// Comprehensive ANSI/terminal escape code stripping
+const stripAnsi = (str) => str
+  .replace(/\x1b\[[\?=>!]?[0-9;]*[a-zA-Z]/g, '')   // CSI sequences (ESC[...X)
+  .replace(/\x9b[0-9;]*[a-zA-Z]/g, '')               // 8-bit CSI (0x9b...X)
+  .replace(/\x1b\][^\x07]*(?:\x07|\x1b\\)/g, '')     // OSC sequences (ESC]...BEL)
+  .replace(/\x1b[()][A-Z0-9]/g, '')                   // Character set selection (ESC(B etc)
+  .replace(/\x1b[>=<~}|]/g, '')                       // Single-char ESC sequences
+  .replace(/\x1b\[[0-9;]*[ -/]*[@-~]/g, '')           // Remaining CSI sequences
+  .replace(/\[[\?]?[0-9;]*[a-zA-Z]/g, '')             // Bare bracket sequences (no ESC)
+  .replace(/\r/g, '');
+
 const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onStatusChange, onClose, fontFamily, fontSize, bgColor }, ref) {
   const termRef = useRef(null);
   const xtermRef = useRef(null);
@@ -45,11 +56,11 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
         // Set up capture
         const timer = setTimeout(() => {
           if (agentCaptureRef.current) {
-            const output = agentCaptureRef.current.buffer;
+            const raw = stripAnsi(agentCaptureRef.current.buffer).trim();
             agentCaptureRef.current = null;
-            resolve(output || '(command timed out after 30s)');
+            resolve(raw || '(command timed out after 60s — it may be waiting for input)');
           }
-        }, 30000);
+        }, 60000);
         agentCaptureRef.current = { buffer: '', resolve, timer };
         // Send the command with sentinel
         socketRef.current.emit('ssh:data', `${command}; echo ${AGENT_SENTINEL}\n`);
@@ -170,9 +181,7 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
       if (agentCaptureRef.current) {
         agentCaptureRef.current.buffer += data;
         // Strip ANSI codes first, then look for sentinel on its own line
-        const stripped = agentCaptureRef.current.buffer
-          .replace(/\x1b\[[\?=>!]?[0-9;]*[a-zA-Z]/g, '')
-          .replace(/\x1b\].*?(\x07|\x1b\\)/g, '');
+        const stripped = stripAnsi(agentCaptureRef.current.buffer);
         // Match sentinel preceded by a line ending (not embedded in the echoed command)
         const sentinelPattern = /[\r\n]__JUNI_AGENT_DONE__/;
         const match = sentinelPattern.exec(stripped);
@@ -184,8 +193,8 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
           const beforeSentinel = stripped.substring(0, match.index);
           const firstNewline = beforeSentinel.indexOf('\n');
           const output = firstNewline >= 0
-            ? beforeSentinel.substring(firstNewline + 1).replace(/\r/g, '').trim()
-            : beforeSentinel.replace(/\r/g, '').trim();
+            ? beforeSentinel.substring(firstNewline + 1).trim()
+            : beforeSentinel.trim();
           resolve(output);
         }
       }

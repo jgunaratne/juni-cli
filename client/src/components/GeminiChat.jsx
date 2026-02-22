@@ -183,10 +183,24 @@ const GeminiChat = forwardRef(function GeminiChat({
       output = '(No terminal connected for agent execution)';
     }
 
+    // Detect timeout — command may be waiting for input
+    const timedOut = output.includes('timed out') || output.includes('waiting for input');
+
     // Update step with output
     setAgentSteps((prev) => prev.map((s, i) =>
-      i === prev.length - 1 ? { ...s, output, status: 'done' } : s
+      i === prev.length - 1
+        ? { ...s, output, status: timedOut ? 'timeout' : 'done' }
+        : s
     ));
+
+    if (timedOut) {
+      // Notify user and stop the agent loop
+      setMessages((prev) => [...prev, {
+        type: 'system',
+        text: 'Command may be waiting for input. Check the terminal and resolve it, then try again.',
+      }]);
+      abortAgentRef.current = true;
+    }
 
     // Build new history with function call and response
     const modelEntry = {
@@ -503,7 +517,7 @@ const GeminiChat = forwardRef(function GeminiChat({
             {step.type === 'command' && (
               <>
                 <div className="agent-step-header">
-                  [{step.status === 'running' ? 'running' : 'done'}] {step.reasoning}
+                  [{step.status === 'running' ? 'running' : step.status === 'timeout' ? 'timeout' : 'done'}] {step.reasoning}
                 </div>
                 <div className="agent-step-command">
                   {'> '}{step.command}
@@ -514,6 +528,11 @@ const GeminiChat = forwardRef(function GeminiChat({
                       ? step.output.substring(0, 2000) + '\n(truncated)'
                       : step.output}
                   </pre>
+                )}
+                {step.status === 'timeout' && (
+                  <div className="agent-step-timeout-msg">
+                    command may need input — check the terminal
+                  </div>
                 )}
               </>
             )}

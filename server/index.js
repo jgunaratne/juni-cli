@@ -157,7 +157,16 @@ const AGENT_SYSTEM_PROMPT =
   'If a command fails, analyze the error and try to fix it. ' +
   'When the task is complete, call task_complete with a summary. ' +
   'If the user asks a question that does not require running commands, respond with plain text. ' +
-  'Never run destructive commands (rm -rf /, mkfs, etc.) without the user explicitly confirming.';
+  '\n\nCRITICAL RULES:\n' +
+  '1. NEVER run interactive commands that wait for user input (vim, nano, vi, less, more, top, htop, python, node, ssh, mysql, psql, irb, etc). ' +
+  '2. Always use non-interactive flags: use -y for apt/yum/dnf, use DEBIAN_FRONTEND=noninteractive, use -f for commands that prompt. ' +
+  '3. For file editing, use echo/printf/cat with heredocs or sed/awk — NEVER use text editors. ' +
+  '4. For writing multi-line files, use: cat > filename << \'EOF\'\n...content...\nEOF ' +
+  '5. When running scripts, ensure they are non-interactive (no read commands, no prompts). ' +
+  '6. If a command might produce paged output, pipe through cat (e.g. git log | cat, man cmd | cat). ' +
+  '7. Never run destructive commands (rm -rf /, mkfs, etc.) without the user explicitly confirming. ' +
+  '8. Keep individual commands short and focused. Avoid long command chains. ' +
+  '9. If you need to check if a program is installed, use "which" or "command -v", not the program itself.';
 
 app.post('/api/gemini/agent', async (req, res) => {
   try {

@@ -1549,3 +1549,8 @@
 .agent-step-error {
   color: #ff7b72;
 }
+.agent-step-timeout-msg {
+  margin-top: 6px;
+  color: #d29922;
+  line-height: 1.5;
+}
