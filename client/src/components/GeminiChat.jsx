@@ -104,7 +104,10 @@ const GeminiChat = forwardRef(function GeminiChat({
   const [agentSteps, setAgentSteps] = useState([]); // { type, command?, reasoning?, output?, summary?, status }
   const [pendingCommand, setPendingCommand] = useState(null); // { command, reasoning } awaiting confirmation
   const [agentRunning, setAgentRunning] = useState(false);
+  const [agentPaused, setAgentPaused] = useState(false);
   const abortAgentRef = useRef(false);
+  const pausedResolverRef = useRef(null); // resolver fn to resume from pause
+  const lastAgentPromptRef = useRef(null); // stores last agent prompt for retry
 
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
@@ -219,6 +222,9 @@ const GeminiChat = forwardRef(function GeminiChat({
 
   const startAgentLoop = useCallback(async (userText) => {
     abortAgentRef.current = false;
+    setAgentPaused(false);
+    pausedResolverRef.current = null;
+    lastAgentPromptRef.current = userText;
     setAgentRunning(true);
     setAgentSteps([]);
     setPendingCommand(null);
@@ -235,6 +241,20 @@ const GeminiChat = forwardRef(function GeminiChat({
         if (abortAgentRef.current) {
           setAgentSteps((prev) => [...prev, { type: 'aborted', status: 'done' }]);
           break;
+        }
+
+        // If paused, wait until resumed or stopped
+        if (pausedResolverRef.current === 'pending') {
+          setAgentPaused(true);
+          await new Promise((resolve) => {
+            pausedResolverRef.current = resolve;
+          });
+          setAgentPaused(false);
+          // Re-check abort after resume
+          if (abortAgentRef.current) {
+            setAgentSteps((prev) => [...prev, { type: 'aborted', status: 'done' }]);
+            break;
+          }
         }
 
         setIsLoading(true);
@@ -281,6 +301,8 @@ const GeminiChat = forwardRef(function GeminiChat({
       }]);
     } finally {
       setAgentRunning(false);
+      setAgentPaused(false);
+      pausedResolverRef.current = null;
       setIsLoading(false);
       requestAnimationFrame(() => inputRef.current?.focus());
     }
@@ -288,7 +310,35 @@ const GeminiChat = forwardRef(function GeminiChat({
 
   const stopAgent = useCallback(() => {
     abortAgentRef.current = true;
+    // If paused, resolve the pause promise so the loop can exit
+    if (typeof pausedResolverRef.current === 'function') {
+      pausedResolverRef.current();
+      pausedResolverRef.current = null;
+    }
+    setAgentPaused(false);
   }, []);
+
+  const pauseAgent = useCallback(() => {
+    if (agentRunning && !agentPaused) {
+      pausedResolverRef.current = 'pending';
+    }
+  }, [agentRunning, agentPaused]);
+
+  const resumeAgent = useCallback(() => {
+    if (typeof pausedResolverRef.current === 'function') {
+      pausedResolverRef.current();
+      pausedResolverRef.current = null;
+    }
+  }, []);
+
+  const retryAgent = useCallback(async () => {
+    const lastPrompt = lastAgentPromptRef.current;
+    if (!lastPrompt || agentRunning) return;
+    // Reset agent history for a clean retry
+    setAgentHistory([]);
+    setMessages((prev) => [...prev, { type: 'system', text: `retrying: ${lastPrompt}` }]);
+    await startAgentLoop(lastPrompt);
+  }, [agentRunning, startAgentLoop]);
 
   /* ── Regular chat send ───────────────────────────────── */
 
@@ -433,8 +483,24 @@ const GeminiChat = forwardRef(function GeminiChat({
         </div>
         <div className="toolbar-right-group">
           {agentRunning && (
-            <button className="disconnect-btn agent-stop-btn" onClick={stopAgent}>
-              ■ Stop
+            <>
+              {agentPaused ? (
+                <button className="disconnect-btn agent-resume-btn" onClick={resumeAgent}>
+                  ▶ Resume
+                </button>
+              ) : (
+                <button className="disconnect-btn agent-pause-btn" onClick={pauseAgent}>
+                  ⏸ Pause
+                </button>
+              )}
+              <button className="disconnect-btn agent-stop-btn" onClick={stopAgent}>
+                ■ Stop
+              </button>
+            </>
+          )}
+          {!agentRunning && lastAgentPromptRef.current && agentMode && (
+            <button className="disconnect-btn agent-retry-btn" onClick={retryAgent}>
+              ↻ Retry
             </button>
           )}
           <button className="disconnect-btn" onClick={handleClear}>
@@ -557,6 +623,14 @@ const GeminiChat = forwardRef(function GeminiChat({
             )}
           </div>
         ))}
+
+        {/* Paused indicator */}
+        {agentPaused && (
+          <div className="gemini-term-line agent-paused-indicator">
+            <span className="agent-paused-icon">⏸</span>
+            <span className="agent-paused-text">agent paused — click Resume to continue</span>
+          </div>
+        )}
 
         {/* Loading indicator */}
         {isLoading && (
