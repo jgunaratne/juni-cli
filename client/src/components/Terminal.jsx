@@ -123,13 +123,8 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
     xtermRef.current = term;
     fitRef.current = fit;
 
-    const isLocal = ['localhost', '127.0.0.1', '::1'].includes(connection.host?.toLowerCase());
     term.writeln('\x1b[1;36m⬡ juni-cli\x1b[0m');
-    if (isLocal) {
-      term.writeln('\x1b[90mOpening local shell…\x1b[0m');
-    } else {
-      term.writeln(`\x1b[90mConnecting to ${connection.username}@${connection.host}:${connection.port}…\x1b[0m`);
-    }
+    term.writeln(`\x1b[90mConnecting to ${connection.username}@${connection.host}:${connection.port}…\x1b[0m`);
     term.writeln('');
 
     // ── Socket.io ─────────────────────────────────────────────
@@ -215,9 +210,7 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
       <div className="terminal-toolbar">
         <div className="toolbar-left">
           <span className="terminal-title">
-            {['localhost', '127.0.0.1', '::1'].includes(connection.host?.toLowerCase())
-              ? 'local shell'
-              : `${connection.username}@${connection.host}:${connection.port}`}
+            {connection.username}@{connection.host}:{connection.port}
           </span>
         </div>
         <button className="disconnect-btn" onClick={onClose}>
