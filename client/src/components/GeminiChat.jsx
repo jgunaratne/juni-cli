@@ -198,6 +198,7 @@ const GeminiChat = forwardRef(function GeminiChat({ model = 'gemini-3-flash-prev
 
   const handleClear = useCallback(() => {
     setMessages([]);
+    setCommandHistory([]);
   }, []);
 
   return (
