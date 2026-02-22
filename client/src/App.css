@@ -1104,7 +1104,7 @@
   padding: 1px 6px;
   cursor: pointer;
   transition: all 0.15s;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--terminal-font, 'JetBrains Mono', monospace);
 }
 
 .gemini-cmd-tag:hover {
