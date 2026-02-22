@@ -1082,6 +1082,10 @@
   height: 100%;
 }
 
+.terminal-viewport .xterm-screen,
+.terminal-viewport .xterm-viewport {
+  height: 100% !important;
+}
 /* ─── Gemini Terminal ─────────────────────────────────────── */
 
 .gemini-toolbar-icon {

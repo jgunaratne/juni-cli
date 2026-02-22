@@ -120,14 +120,20 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
     term.open(termRef.current);
 
     // ── Fit terminal to container via ResizeObserver ────────
+    let resizeTimer;
     const resizeObserver = new ResizeObserver(() => {
-      requestAnimationFrame(() => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
         try {
           fit.fit();
+          const { cols, rows } = term;
+          if (socketRef.current) {
+            socketRef.current.emit('ssh:resize', { cols, rows });
+          }
         } catch {
           // terminal may be disposed during cleanup
         }
-      });
+      }, 50);
     });
 
     resizeObserver.observe(termRef.current);
@@ -237,6 +243,7 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
     return () => {
       el.removeEventListener('mousedown', handleMouseDown);
       selDisposable.dispose();
+      clearTimeout(resizeTimer);
       resizeObserver.disconnect();
       socket.disconnect();
       term.dispose();
