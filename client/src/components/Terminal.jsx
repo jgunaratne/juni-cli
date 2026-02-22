@@ -2,6 +2,7 @@ import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { io } from 'socket.io-client';
+import CrtShader from './CrtShader';
 import '@xterm/xterm/css/xterm.css';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || window.location.origin;
@@ -19,7 +20,7 @@ const stripAnsi = (str) => str
   .replace(/\[[\?]?[0-9;]*[a-zA-Z]/g, '')             // Bare bracket sequences (no ESC)
   .replace(/\r/g, '');
 
-const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onStatusChange, onClose, fontFamily, fontSize, bgColor }, ref) {
+const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onStatusChange, onClose, fontFamily, fontSize, bgColor, crtEffect }, ref) {
   const termRef = useRef(null);
   const xtermRef = useRef(null);
   const fitRef = useRef(null);
@@ -296,7 +297,9 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
           ✕
         </button>
       </div>
-      <div className="terminal-viewport" ref={termRef} />
+      <div className="terminal-viewport" ref={termRef} style={{ position: 'relative' }}>
+        {crtEffect && <CrtShader />}
+      </div>
     </div>
   );
 });

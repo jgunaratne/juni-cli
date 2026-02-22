@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
+import CrtShader from './CrtShader';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || window.location.origin;
 
@@ -35,7 +36,7 @@ function renderForTerminal(text) {
 
 /* ── Component ────────────────────────────────────────── */
 
-const ClaudeChat = forwardRef(function ClaudeChat({ model = 'claude-sonnet-4-20250514', isActive, onStatusChange, onRunCommand }, ref) {
+const ClaudeChat = forwardRef(function ClaudeChat({ model = 'claude-sonnet-4-20250514', isActive, onStatusChange, onRunCommand, crtEffect = false }, ref) {
   useImperativeHandle(ref, () => ({
     focus: () => inputRef.current?.focus(),
     pasteText: (text) => {
@@ -188,7 +189,9 @@ const ClaudeChat = forwardRef(function ClaudeChat({ model = 'claude-sonnet-4-202
             inputRef.current?.focus();
           }
         }}
+        style={{ position: 'relative' }}
       >
+        {crtEffect && <CrtShader />}
         {/* Welcome banner */}
         {messages.length === 0 && !isLoading && (
           <div className="gemini-term-welcome">
