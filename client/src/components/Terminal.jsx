@@ -251,6 +251,24 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Refit when terminal becomes visible
+  useEffect(() => {
+    if (!isActive || !fitRef.current || !xtermRef.current) return;
+    // Delay to allow layout to settle after display changes from none to flex
+    const timer = setTimeout(() => {
+      try {
+        fitRef.current.fit();
+        const { cols, rows } = xtermRef.current;
+        if (socketRef.current) {
+          socketRef.current.emit('ssh:resize', { cols, rows });
+        }
+      } catch {
+        // terminal may be disposed
+      }
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [isActive]);
+
   return (
     <div
       className="terminal-container"
