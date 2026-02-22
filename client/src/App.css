@@ -668,6 +668,7 @@
 .app-main {
   flex: 1;
   display: flex;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -680,6 +681,7 @@
 .split-panel {
   display: flex;
   flex-direction: column;
+  min-height: 0;
   overflow: hidden;
 }
 
