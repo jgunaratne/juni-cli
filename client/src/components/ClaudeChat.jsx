@@ -206,7 +206,7 @@ const ClaudeChat = forwardRef(function ClaudeChat({ model = 'claude-sonnet-4-202
           <div key={i} className={`gemini-term-line gemini-term-line--${entry.type}`}>
             {entry.type === 'user' && (
               <>
-                <span className="gemini-term-prompt-symbol claude-prompt-symbol">❯</span>
+                <span className="gemini-term-prompt-symbol claude-prompt-symbol">claude:/&gt;</span>
                 <span className="gemini-term-prompt-text">{entry.text}</span>
               </>
             )}
@@ -257,7 +257,7 @@ const ClaudeChat = forwardRef(function ClaudeChat({ model = 'claude-sonnet-4-202
             className="gemini-term-input-line"
             onClick={() => inputRef.current?.focus()}
           >
-            <span className="gemini-term-prompt-symbol claude-prompt-symbol">❯</span>
+            <span className="gemini-term-prompt-symbol claude-prompt-symbol">claude:/&gt;</span>
             <div className="gemini-term-input-wrapper">
               <span className="gemini-term-input-display">
                 {input}

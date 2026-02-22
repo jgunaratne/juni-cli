@@ -220,7 +220,7 @@ const GeminiChat = forwardRef(function GeminiChat({ model = 'gemini-3-flash-prev
           <div key={i} className={`gemini-term-line gemini-term-line--${entry.type}`}>
             {entry.type === 'user' && (
               <>
-                <span className="gemini-term-prompt-symbol">❯</span>
+                <span className="gemini-term-prompt-symbol">gemini:/&gt;</span>
                 <span className="gemini-term-prompt-text">{entry.text}</span>
               </>
             )}
@@ -271,7 +271,7 @@ const GeminiChat = forwardRef(function GeminiChat({ model = 'gemini-3-flash-prev
             className="gemini-term-input-line"
             onClick={() => inputRef.current?.focus()}
           >
-            <span className="gemini-term-prompt-symbol">❯</span>
+            <span className="gemini-term-prompt-symbol">gemini:/&gt;</span>
             <div className="gemini-term-input-wrapper">
               <span className="gemini-term-input-display">{input}</span>
               <span className="gemini-term-cursor" />

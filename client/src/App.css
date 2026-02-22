@@ -1188,6 +1188,8 @@
 
 .gemini-term-prompt-symbol {
   color: #56d364;
+  font-family: inherit;
+    font-size: inherit;
   font-weight: 600;
   flex-shrink: 0;
   user-select: none;
