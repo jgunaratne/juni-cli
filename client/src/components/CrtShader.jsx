@@ -229,110 +229,140 @@ export default function CrtShader() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     canvas.dataset.crtShader = 'true';
-
-    const gl = canvas.getContext('webgl', { alpha: true, premultipliedAlpha: false });
-    if (!gl) return;
-
     const parent = canvas.parentElement;
-    const sourceCanvas = findSourceCanvas(parent);
-    const usePostProcess = !!sourceCanvas;
-    const fragSource = usePostProcess ? FRAGMENT_SHADER : FALLBACK_FRAGMENT;
 
-    const vs = compileShader(gl, gl.VERTEX_SHADER, VERTEX_SHADER);
-    const fs = compileShader(gl, gl.FRAGMENT_SHADER, fragSource);
-    if (!vs || !fs) return;
+    let cleanupFn = null;
 
-    const program = linkProgram(gl, vs, fs);
-    if (!program) return;
+    function init(sourceCanvas) {
+      const gl = canvas.getContext('webgl', { alpha: true, premultipliedAlpha: false });
+      if (!gl) return;
 
-    const buf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-      -1, -1, 1, -1, -1, 1,
-      -1, 1, 1, -1, 1, 1,
-    ]), gl.STATIC_DRAW);
+      const usePostProcess = !!sourceCanvas;
+      const fragSource = usePostProcess ? FRAGMENT_SHADER : FALLBACK_FRAGMENT;
 
-    const aPos = gl.getAttribLocation(program, 'a_position');
-    const uRes = gl.getUniformLocation(program, 'u_resolution');
-    const uSource = usePostProcess ? gl.getUniformLocation(program, 'u_source') : null;
-    const uFrame = usePostProcess ? gl.getUniformLocation(program, 'u_frame') : null;
-    const uTime = !usePostProcess ? gl.getUniformLocation(program, 'u_time') : null;
+      const vs = compileShader(gl, gl.VERTEX_SHADER, VERTEX_SHADER);
+      const fs = compileShader(gl, gl.FRAGMENT_SHADER, fragSource);
+      if (!vs || !fs) return;
 
-    let texture = null;
-    if (usePostProcess) {
-      texture = gl.createTexture();
-      gl.bindTexture(gl.TEXTURE_2D, texture);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    }
+      const program = linkProgram(gl, vs, fs);
+      if (!program) return;
 
-    if (!usePostProcess) {
-      gl.enable(gl.BLEND);
-      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    }
-
-    const resize = () => {
-      if (!parent) return;
-      const { width, height } = parent.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
-      canvas.width = width * dpr;
-      canvas.height = height * dpr;
-      canvas.style.width = `${width}px`;
-      canvas.style.height = `${height}px`;
-      gl.viewport(0, 0, canvas.width, canvas.height);
-    };
-
-    const observer = new ResizeObserver(resize);
-    observer.observe(parent);
-    resize();
-
-    let frameCount = 0;
-    const startTime = performance.now();
-
-    const render = () => {
-      const time = (performance.now() - startTime) / 1000;
-      frameCount++;
-
-      gl.clearColor(0, 0, 0, 0);
-      gl.clear(gl.COLOR_BUFFER_BIT);
-
-      gl.useProgram(program);
-      gl.enableVertexAttribArray(aPos);
+      const buf = gl.createBuffer();
       gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-      gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+        -1, -1, 1, -1, -1, 1,
+        -1, 1, 1, -1, 1, 1,
+      ]), gl.STATIC_DRAW);
 
-      gl.uniform2f(uRes, canvas.width, canvas.height);
+      const aPos = gl.getAttribLocation(program, 'a_position');
+      const uRes = gl.getUniformLocation(program, 'u_resolution');
+      const uSource = usePostProcess ? gl.getUniformLocation(program, 'u_source') : null;
+      const uFrame = usePostProcess ? gl.getUniformLocation(program, 'u_frame') : null;
+      const uTime = !usePostProcess ? gl.getUniformLocation(program, 'u_time') : null;
 
-      if (usePostProcess && sourceCanvas) {
-        gl.activeTexture(gl.TEXTURE0);
+      let texture = null;
+      if (usePostProcess) {
+        texture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, texture);
-        try {
-          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, sourceCanvas);
-        } catch {
-          // Canvas may be tainted
-        }
-        gl.uniform1i(uSource, 0);
-        gl.uniform1i(uFrame, frameCount);
-      } else if (uTime) {
-        gl.uniform1f(uTime, time);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
       }
 
-      gl.drawArrays(gl.TRIANGLES, 0, 6);
-      rafRef.current = requestAnimationFrame(render);
-    };
+      if (!usePostProcess) {
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      }
 
-    rafRef.current = requestAnimationFrame(render);
+      const resize = () => {
+        if (!parent) return;
+        const { width, height } = parent.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+        gl.viewport(0, 0, canvas.width, canvas.height);
+      };
+
+      const observer = new ResizeObserver(resize);
+      observer.observe(parent);
+      resize();
+
+      let frameCount = 0;
+      const startTime = performance.now();
+
+      const render = () => {
+        const time = (performance.now() - startTime) / 1000;
+        frameCount++;
+
+        gl.clearColor(0, 0, 0, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+
+        gl.useProgram(program);
+        gl.enableVertexAttribArray(aPos);
+        gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+        gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+        gl.uniform2f(uRes, canvas.width, canvas.height);
+
+        if (usePostProcess && sourceCanvas) {
+          gl.activeTexture(gl.TEXTURE0);
+          gl.bindTexture(gl.TEXTURE_2D, texture);
+          try {
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, sourceCanvas);
+          } catch {
+            // Canvas may be tainted
+          }
+          gl.uniform1i(uSource, 0);
+          gl.uniform1i(uFrame, frameCount);
+        } else if (uTime) {
+          gl.uniform1f(uTime, time);
+        }
+
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        rafRef.current = requestAnimationFrame(render);
+      };
+
+      rafRef.current = requestAnimationFrame(render);
+
+      cleanupFn = () => {
+        cancelAnimationFrame(rafRef.current);
+        observer.disconnect();
+        if (texture) gl.deleteTexture(texture);
+        gl.deleteProgram(program);
+        gl.deleteShader(vs);
+        gl.deleteShader(fs);
+        gl.deleteBuffer(buf);
+      };
+    }
+
+    // Wait for the source canvas (xterm renders async)
+    let retryTimer = null;
+    let retryCount = 0;
+    const maxRetries = 30; // ~3 seconds
+
+    function tryInit() {
+      const sourceCanvas = findSourceCanvas(parent);
+      if (sourceCanvas) {
+        init(sourceCanvas);
+        return;
+      }
+      retryCount++;
+      if (retryCount < maxRetries) {
+        retryTimer = setTimeout(tryInit, 100);
+      } else {
+        // Give up finding a canvas, use fallback
+        init(null);
+      }
+    }
+
+    tryInit();
 
     return () => {
-      cancelAnimationFrame(rafRef.current);
-      observer.disconnect();
-      if (texture) gl.deleteTexture(texture);
-      gl.deleteProgram(program);
-      gl.deleteShader(vs);
-      gl.deleteShader(fs);
-      gl.deleteBuffer(buf);
+      clearTimeout(retryTimer);
+      if (cleanupFn) cleanupFn();
     };
   }, []);
 
