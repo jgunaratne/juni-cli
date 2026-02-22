@@ -227,6 +227,16 @@ function App() {
     return termRef.runAgentCommand(command);
   }, [activeTab, tabs]);
 
+  const handleSendAgentKeys = useCallback(async (keys) => {
+    const sshTabId = activeTab && tabs.find((t) => t.id === activeTab && t.type === 'ssh')
+      ? activeTab
+      : tabs.find((t) => t.type === 'ssh')?.id;
+    if (!sshTabId) return '(No SSH terminal connected)';
+    const termRef = terminalRefs.current[sshTabId];
+    if (!termRef) return '(Terminal ref not found)';
+    return termRef.sendAgentKeys(keys);
+  }, [activeTab, tabs]);
+
   const getTabLabel = (tab) => {
     if (tab.type === 'gemini') return 'Gemini';
     if (tab.type === 'claude') return 'Claude';
@@ -492,7 +502,7 @@ function App() {
                   onRunCommand={handleRunCommand}
                     agentMode={agentMode}
                     onRunAgentCommand={handleRunAgentCommand}
-
+                    onSendAgentKeys={handleSendAgentKeys}
                 />
               )
             ) : tab.type === 'claude' ? (
@@ -525,7 +535,7 @@ function App() {
                 onRunCommand={handleRunCommand}
                 agentMode={agentMode}
                 onRunAgentCommand={handleRunAgentCommand}
-
+                onSendAgentKeys={handleSendAgentKeys}
               />
             </div>
           </>

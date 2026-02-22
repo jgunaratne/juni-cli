@@ -78,7 +78,7 @@ const GeminiChat = forwardRef(function GeminiChat({
   onRunCommand,
   agentMode = false,
   onRunAgentCommand,
-
+  onSendAgentKeys,
 }, ref) {
   const pastedTextRef = useRef(null);
   const autoSendRef = useRef(false);
@@ -105,6 +105,7 @@ const GeminiChat = forwardRef(function GeminiChat({
   const [pendingCommand, setPendingCommand] = useState(null); // { command, reasoning } awaiting confirmation
   const [agentRunning, setAgentRunning] = useState(false);
   const [agentPaused, setAgentPaused] = useState(false);
+  const [agentStopping, setAgentStopping] = useState(false);
   const abortAgentRef = useRef(false);
   const pausedResolverRef = useRef(null); // resolver fn to resume from pause
   const lastAgentPromptRef = useRef(null); // stores last agent prompt for retry
@@ -160,6 +161,10 @@ const GeminiChat = forwardRef(function GeminiChat({
 
       if (name === 'run_command') {
         return { type: 'command', command: args.command, reasoning: args.reasoning, parts };
+      }
+
+      if (name === 'send_keys') {
+        return { type: 'send_keys', keys: args.keys, reasoning: args.reasoning, parts };
       }
     }
 
@@ -219,6 +224,43 @@ const GeminiChat = forwardRef(function GeminiChat({
 
     return [...currentHistory, modelEntry, functionResponseEntry];
   }, [onRunAgentCommand]);
+
+  const executeAgentSendKeys = useCallback(async (keys, reasoning, currentHistory) => {
+    // Add the step to UI
+    setAgentSteps((prev) => [...prev, {
+      type: 'send_keys',
+      keys,
+      reasoning,
+      status: 'running',
+    }]);
+
+    // Send the keys via the terminal
+    let output = '';
+    if (onSendAgentKeys) {
+      output = await onSendAgentKeys(keys);
+    } else {
+      output = '(No terminal connected for sending keys)';
+    }
+
+    // Update step with output
+    setAgentSteps((prev) => prev.map((s, i) =>
+      i === prev.length - 1
+        ? { ...s, output, status: 'done' }
+        : s
+    ));
+
+    // Build new history with function call and response
+    const modelEntry = {
+      role: 'model',
+      parts: [{ functionCall: { name: 'send_keys', args: { keys, reasoning } } }],
+    };
+    const functionResponseEntry = {
+      role: 'user',
+      parts: [{ functionResponse: { name: 'send_keys', response: { output } } }],
+    };
+
+    return [...currentHistory, modelEntry, functionResponseEntry];
+  }, [onSendAgentKeys]);
 
   const startAgentLoop = useCallback(async (userText) => {
     abortAgentRef.current = false;
@@ -291,6 +333,12 @@ const GeminiChat = forwardRef(function GeminiChat({
           history = await executeAgentCommand(result.command, result.reasoning, history);
           setAgentHistory(history);
         }
+
+        if (result.type === 'send_keys') {
+          // Send keystrokes to the terminal
+          history = await executeAgentSendKeys(result.keys, result.reasoning, history);
+          setAgentHistory(history);
+        }
       }
     } catch (err) {
       setIsLoading(false);
@@ -302,14 +350,16 @@ const GeminiChat = forwardRef(function GeminiChat({
     } finally {
       setAgentRunning(false);
       setAgentPaused(false);
+      setAgentStopping(false);
       pausedResolverRef.current = null;
       setIsLoading(false);
       requestAnimationFrame(() => inputRef.current?.focus());
     }
-  }, [agentHistory, runAgentStep, executeAgentCommand]);
+  }, [agentHistory, runAgentStep, executeAgentCommand, executeAgentSendKeys]);
 
   const stopAgent = useCallback(() => {
     abortAgentRef.current = true;
+    setAgentStopping(true);
     // If paused, resolve the pause promise so the loop can exit
     if (typeof pausedResolverRef.current === 'function') {
       pausedResolverRef.current();
@@ -470,6 +520,20 @@ const GeminiChat = forwardRef(function GeminiChat({
     setAgentSteps([]);
   }, []);
 
+  const handleNewChat = useCallback(() => {
+    setMessages([]);
+    setCommandHistory([]);
+    setAgentHistory([]);
+    setAgentSteps([]);
+    setPendingCommand(null);
+    lastAgentPromptRef.current = null;
+    setInput('');
+    setHistoryIndex(-1);
+    localStorage.removeItem(CHAT_HISTORY_KEY);
+    localStorage.removeItem(CMD_HISTORY_KEY);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }, []);
+
   return (
     <div
       className="terminal-container"
@@ -493,8 +557,16 @@ const GeminiChat = forwardRef(function GeminiChat({
                   ⏸ Pause
                 </button>
               )}
-              <button className="disconnect-btn agent-stop-btn" onClick={stopAgent}>
-                ■ Stop
+              <button
+                className={`disconnect-btn agent-stop-btn ${agentStopping ? 'agent-stop-btn--stopping' : ''}`}
+                onClick={stopAgent}
+                disabled={agentStopping}
+              >
+                {agentStopping ? (
+                  <><span className="agent-stop-spinner" />Stopping…</>
+                ) : (
+                  '■ Stop'
+                )}
               </button>
             </>
           )}
@@ -503,7 +575,12 @@ const GeminiChat = forwardRef(function GeminiChat({
               ↻ Retry
             </button>
           )}
-          <button className="disconnect-btn" onClick={handleClear}>
+          {!agentRunning && (
+            <button className="disconnect-btn new-chat-btn" onClick={handleNewChat} title="Start a new chat">
+              ✦+ New Chat
+            </button>
+          )}
+          <button className="disconnect-btn" onClick={handleClear} title="Clear screen">
             ⌫
           </button>
         </div>
@@ -603,6 +680,23 @@ const GeminiChat = forwardRef(function GeminiChat({
                   <div className="agent-step-timeout-msg">
                     command may need input — check the terminal
                   </div>
+                )}
+              </>
+            )}
+            {step.type === 'send_keys' && (
+              <>
+                <div className="agent-step-header">
+                  [{step.status === 'running' ? 'sending' : 'sent'}] {step.reasoning}
+                </div>
+                <div className="agent-step-command agent-step-keys">
+                  {'⌨ '}{step.keys}
+                </div>
+                {step.output && (
+                  <pre className="agent-step-output">
+                    {step.output.length > 2000
+                      ? step.output.substring(0, 2000) + '\n(truncated)'
+                      : step.output}
+                  </pre>
                 )}
               </>
             )}

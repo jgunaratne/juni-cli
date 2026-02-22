@@ -48,6 +48,73 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
         socketRef.current.emit('ssh:data', text);
       }
     },
+    sendAgentKeys: (keys) => {
+      return new Promise((resolve) => {
+        if (!socketRef.current) {
+          resolve('Error: terminal not connected');
+          return;
+        }
+
+        // Map special key names to terminal escape sequences
+        const KEY_MAP = {
+          'Enter': '\r',
+          'Return': '\r',
+          'Tab': '\t',
+          'Escape': '\x1b',
+          'Esc': '\x1b',
+          'Backspace': '\x7f',
+          'Delete': '\x1b[3~',
+          'Up': '\x1b[A',
+          'Down': '\x1b[B',
+          'Right': '\x1b[C',
+          'Left': '\x1b[D',
+          'Home': '\x1b[H',
+          'End': '\x1b[F',
+          'PageUp': '\x1b[5~',
+          'PageDown': '\x1b[6~',
+          'Ctrl+C': '\x03',
+          'Ctrl+D': '\x04',
+          'Ctrl+Z': '\x1a',
+          'Ctrl+L': '\x0c',
+          'Ctrl+A': '\x01',
+          'Ctrl+E': '\x05',
+          'Ctrl+K': '\x0b',
+          'Ctrl+U': '\x15',
+          'Ctrl+W': '\x17',
+          'Ctrl+R': '\x12',
+          'Space': ' ',
+        };
+
+        // Parse the keys string — split by spaces, map special names, pass through plain text
+        const tokens = keys.split(/\s+/);
+        let payload = '';
+        for (const token of tokens) {
+          if (KEY_MAP[token] !== undefined) {
+            payload += KEY_MAP[token];
+          } else {
+            // Plain text — send as-is
+            payload += token;
+          }
+        }
+
+        // Capture a snapshot of output for ~3 seconds after sending
+        let outputBuffer = '';
+        const onOutput = (data) => {
+          outputBuffer += data;
+        };
+        socketRef.current.on('ssh:output', onOutput);
+
+        // Send the keystrokes
+        socketRef.current.emit('ssh:data', payload);
+
+        // Wait 3 seconds, then return whatever appeared
+        setTimeout(() => {
+          socketRef.current?.off('ssh:output', onOutput);
+          const cleaned = stripAnsi(outputBuffer).trim();
+          resolve(cleaned || '(no visible output after sending keys)');
+        }, 3000);
+      });
+    },
     runAgentCommand: (command) => {
       return new Promise((resolve) => {
         if (!socketRef.current) {

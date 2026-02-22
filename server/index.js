@@ -131,6 +131,33 @@ const AGENT_TOOLS = [
         },
       },
       {
+        name: 'send_keys',
+        description:
+          'Send raw keystrokes or text directly to the terminal. ' +
+          'Use this to interact with interactive programs, respond to prompts (y/n, passwords, etc.), ' +
+          'send control sequences (Ctrl+C to cancel, Ctrl+D for EOF), or type text into running programs. ' +
+          'Unlike run_command, this does NOT wait for a command to complete — it just sends the keystrokes and captures a brief snapshot of what appears. ' +
+          'Special key names you can use in the keys field: Enter, Ctrl+C, Ctrl+D, Ctrl+Z, Ctrl+L, Tab, Escape, Up, Down, Left, Right, Backspace, Delete.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            keys: {
+              type: 'STRING',
+              description:
+                'The text or keystrokes to send. For regular text, just type it. ' +
+                'For special keys, use names like "Enter", "Ctrl+C", "Tab". ' +
+                'You can combine text and special keys by separating with a space, e.g. "y Enter" to type y then press Enter. ' +
+                'To send just Enter (newline), use "Enter". To send Ctrl+C, use "Ctrl+C".',
+            },
+            reasoning: {
+              type: 'STRING',
+              description: 'Brief explanation of why you are sending these keystrokes',
+            },
+          },
+          required: ['keys', 'reasoning'],
+        },
+      },
+      {
         name: 'task_complete',
         description:
           'Signal that the task is finished. Call this when you have completed the user\'s request or determined it cannot be completed.',
@@ -157,16 +184,29 @@ const AGENT_SYSTEM_PROMPT =
   'If a command fails, analyze the error and try to fix it. ' +
   'When the task is complete, call task_complete with a summary. ' +
   'If the user asks a question that does not require running commands, respond with plain text. ' +
+  '\n\nTOOLS:\n' +
+  '- run_command: Execute a shell command and get its full output. Best for non-interactive commands. ' +
+  'Always prefer this for standard commands.\n' +
+  '- send_keys: Send raw keystrokes/text to the terminal. Use this when you need to:\n' +
+  '  * Respond to an interactive prompt (e.g. type "y" and press Enter)\n' +
+  '  * Send Ctrl+C to cancel a stuck or long-running process\n' +
+  '  * Send Ctrl+D for EOF\n' +
+  '  * Interact with a running program that expects input\n' +
+  '  * Type text into a TUI or interactive application\n' +
+  'Note: send_keys only captures a brief snapshot of terminal output (~3 seconds), not strict command-completion output.\n' +
   '\n\nCRITICAL RULES:\n' +
-  '1. NEVER run interactive commands that wait for user input (vim, nano, vi, less, more, top, htop, python, node, ssh, mysql, psql, irb, etc). ' +
-  '2. Always use non-interactive flags: use -y for apt/yum/dnf, use DEBIAN_FRONTEND=noninteractive, use -f for commands that prompt. ' +
-  '3. For file editing, use echo/printf/cat with heredocs or sed/awk — NEVER use text editors. ' +
-  '4. For writing multi-line files, use: cat > filename << \'EOF\'\n...content...\nEOF ' +
-  '5. When running scripts, ensure they are non-interactive (no read commands, no prompts). ' +
-  '6. If a command might produce paged output, pipe through cat (e.g. git log | cat, man cmd | cat). ' +
-  '7. Never run destructive commands (rm -rf /, mkfs, etc.) without the user explicitly confirming. ' +
-  '8. Keep individual commands short and focused. Avoid long command chains. ' +
-  '9. If you need to check if a program is installed, use "which" or "command -v", not the program itself.';
+  '1. Prefer run_command over send_keys for standard commands — send_keys is for interactive situations only. ' +
+  '2. NEVER run interactive commands that wait for user input via run_command (vim, nano, vi, less, more, top, htop, python, node, ssh, mysql, psql, irb, etc). ' +
+  'If you must interact with such programs, prefer non-interactive alternatives. If absolutely necessary, use send_keys. ' +
+  '3. Always use non-interactive flags: use -y for apt/yum/dnf, use DEBIAN_FRONTEND=noninteractive, use -f for commands that prompt. ' +
+  '4. For file editing, use echo/printf/cat with heredocs or sed/awk — NEVER use text editors. ' +
+  '5. For writing multi-line files, use: cat > filename << \'EOF\'\n...content...\nEOF ' +
+  '6. When running scripts, ensure they are non-interactive (no read commands, no prompts). ' +
+  '7. If a command might produce paged output, pipe through cat (e.g. git log | cat, man cmd | cat). ' +
+  '8. Never run destructive commands (rm -rf /, mkfs, etc.) without the user explicitly confirming. ' +
+  '9. Keep individual commands short and focused. Avoid long command chains. ' +
+  '10. If you need to check if a program is installed, use "which" or "command -v", not the program itself. ' +
+  '11. If a run_command times out or reports "waiting for input", use send_keys with Ctrl+C to cancel it, then try a different approach.';
 
 app.post('/api/gemini/agent', async (req, res) => {
   try {
