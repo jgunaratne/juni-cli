@@ -365,6 +365,13 @@ function App() {
                       onChange={(e) => setBgColor(e.target.value)}
                       style={{ flex: 1 }}
                     />
+                    <button
+                      className="settings-reset-btn"
+                      onClick={() => setBgColor('#0d1117')}
+                      title="Reset to default"
+                    >
+                      Reset
+                    </button>
                   </div>
                 </div>
                 <label className="settings-toggle">

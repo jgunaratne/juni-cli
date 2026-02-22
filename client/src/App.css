@@ -665,6 +665,23 @@
 .settings-input::placeholder {
   color: var(--text-muted);
 }
+.settings-reset-btn {
+  height: 32px;
+  padding: 0 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  white-space: nowrap;
+}
+
+.settings-reset-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
 .app-main {
   flex: 1;
   display: flex;
@@ -1309,50 +1326,22 @@
 
 .gemini-term-input-wrapper {
   flex: 1;
-  position: relative;
-    display: flex;
+  display: flex;
     align-items: center;
     min-height: 21px;
   }
-  
-  .gemini-term-input-display {
-  color: #f0f6fc;
-  font-family: var(--terminal-font, 'JetBrains Mono', monospace);
-    font-size: var(--terminal-font-size, 14px);
-  line-height: 1.5;
-  white-space: pre;
-}
-
 .gemini-term-input {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
+  flex: 1;
+  font-family: var(--terminal-font, 'JetBrains Mono', monospace);
   font-size: var(--terminal-font-size, 14px);
+  line-height: 1.5;
+  color: #f0f6fc;
+    background: none;
   border: none;
-  background: none;
-}
-
-/* ── Blinking block cursor ──────────────────────── */
-
-.gemini-term-cursor {
-  display: inline-block;
-  width: 1ch;
-    height: 1.2em;
-    background: #f0f6fc;
-  vertical-align: text-bottom;
-  animation: geminiCursorBlink 1s step-end infinite;
-}
-
-@keyframes geminiCursorBlink {
-
-  0%,
-  100% {
-    opacity: 1;
-  }
-
-  50% {
-    opacity: 0;
-  }
+    outline: none;
+      caret-color: #f0f6fc;
+      padding: 0;
+      margin: 0;
 }
 /* ── Agent mode ──────────────────────────────────── */
 

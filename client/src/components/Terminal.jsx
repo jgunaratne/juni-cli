@@ -85,13 +85,14 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
     }
   }, [isActive]);
 
-  // Update font when settings change
+  // Update font and background when settings change
   useEffect(() => {
     if (!xtermRef.current || !fitRef.current) return;
     if (fontFamily) xtermRef.current.options.fontFamily = `'${fontFamily}', monospace`;
     if (fontSize) xtermRef.current.options.fontSize = fontSize;
+    if (bgColor) xtermRef.current.options.theme = { ...xtermRef.current.options.theme, background: bgColor };
     try { fitRef.current.fit(); } catch { /* not ready */ }
-  }, [fontFamily, fontSize]);
+  }, [fontFamily, fontSize, bgColor]);
 
   useEffect(() => {
     // ── Initialise xterm ──────────────────────────────────────

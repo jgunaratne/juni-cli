@@ -574,8 +574,6 @@ const GeminiChat = forwardRef(function GeminiChat({
               {agentMode ? 'agent:/>' : 'gemini:/>'}
             </span>
             <div className="gemini-term-input-wrapper">
-              <span className="gemini-term-input-display">{input}</span>
-              <span className="gemini-term-cursor" />
               <input
                 ref={inputRef}
                 className="gemini-term-input"
