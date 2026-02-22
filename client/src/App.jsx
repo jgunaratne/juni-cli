@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import ConnectionForm from './components/ConnectionForm';
 import Terminal from './components/Terminal';
 import GeminiChat from './components/GeminiChat';
+import ClaudeChat from './components/ClaudeChat';
 import './App.css';
 
 let nextId = 1;
@@ -131,6 +132,14 @@ function App() {
     setShowForm(false);
   }, []);
 
+  const handleOpenClaude = useCallback(() => {
+    const id = nextId++;
+    const newTab = { id, type: 'claude', status: 'connecting' };
+    setTabs((prev) => [...prev, newTab]);
+    setActiveTab(id);
+    setShowForm(false);
+  }, []);
+
   const handleStatusChange = useCallback((tabId, newStatus) => {
     setTabs((prev) =>
       prev.map((t) => (t.id === tabId ? { ...t, status: newStatus } : t)),
@@ -203,6 +212,7 @@ function App() {
 
   const getTabLabel = (tab) => {
     if (tab.type === 'gemini') return 'Gemini';
+    if (tab.type === 'claude') return 'Claude';
     return `${tab.connection.username}@${tab.connection.host}`;
   };
 
@@ -326,11 +336,13 @@ function App() {
           {tabs.map((tab) => (
             <div
               key={tab.id}
-              className={`tab ${tab.id === activeTab && !showForm ? 'active' : ''} ${tab.type === 'gemini' ? 'tab--gemini' : ''}`}
+              className={`tab ${tab.id === activeTab && !showForm ? 'active' : ''} ${tab.type === 'gemini' ? 'tab--gemini' : ''} ${tab.type === 'claude' ? 'tab--claude' : ''}`}
               onClick={() => switchTab(tab.id)}
             >
               {tab.type === 'gemini' ? (
                 <span className="tab-gemini-icon">✦</span>
+              ) : tab.type === 'claude' ? (
+                <span className="tab-gemini-icon" style={{ color: '#d4a574' }}>◈</span>
               ) : (
                   <span className={`tab-status-dot ${tab.status}`} />
               )}
@@ -362,6 +374,13 @@ function App() {
             >
               ✦
             </button>
+            <button
+              className="tab-new tab-new--claude"
+              onClick={handleOpenClaude}
+              title="New Claude chat"
+            >
+              ◈
+            </button>
           </div>
         </div>
       )}
@@ -388,19 +407,28 @@ function App() {
                 fontFamily={fontFamily}
                 fontSize={fontSize}
               />
-            ) : (
-                /* In split mode, hide Gemini tabs from the left panel */
-                !splitMode && (
-                  <GeminiChat
-                    key={tab.id}
-                    model={selectedModel}
-                    isActive={tab.id === activeTab && !showForm}
-                    onStatusChange={(status) => handleStatusChange(tab.id, status)}
-                    onClose={() => handleCloseTab(tab.id)}
-                    onRunCommand={handleRunCommand}
-                  />
-                )
-            ),
+            ) : tab.type === 'gemini' ? (
+              !splitMode && (
+                <GeminiChat
+                  key={tab.id}
+                  model={selectedModel}
+                  isActive={tab.id === activeTab && !showForm}
+                  onStatusChange={(status) => handleStatusChange(tab.id, status)}
+                  onClose={() => handleCloseTab(tab.id)}
+                  onRunCommand={handleRunCommand}
+                />
+              )
+            ) : tab.type === 'claude' ? (
+              !splitMode && (
+                <ClaudeChat
+                  key={tab.id}
+                  isActive={tab.id === activeTab && !showForm}
+                  onStatusChange={(status) => handleStatusChange(tab.id, status)}
+                  onClose={() => handleCloseTab(tab.id)}
+                  onRunCommand={handleRunCommand}
+                />
+              )
+            ) : null,
           )}
         </div>
 

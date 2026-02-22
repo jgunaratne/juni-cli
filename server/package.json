@@ -8,6 +8,7 @@
     "dev": "npx -y nodemon index.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
     "@google-cloud/vertexai": "^1.10.0",
     "cors": "^2.8.5",
     "dotenv": "^17.3.1",

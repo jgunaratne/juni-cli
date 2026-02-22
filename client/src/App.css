@@ -229,8 +229,8 @@
 .settings-gear--active {
   color: var(--accent);
   border-color: var(--accent);
-  background: rgba(88, 166, 255, 0.1);
-  transform: rotate(60deg);
+  background: rgba(88, 166, 255, 0.15);
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
 .settings-panel {
@@ -546,7 +546,71 @@
   color: #fbbc04;
   background: rgba(251, 188, 4, 0.08);
 }
-/* ─── Main ────────────────────────────────────────────────── */
+.tab-new--claude {
+  font-size: 14px;
+  background: transparent;
+}
+
+.tab-new--claude:hover {
+  color: #d4a574;
+  background: rgba(212, 165, 116, 0.08);
+}
+
+.tab--claude.active {
+  border-color: rgba(212, 165, 116, 0.5);
+}
+
+/* ── Claude accent overrides ───────────────────── */
+
+.claude-term-ascii {
+  background: linear-gradient(135deg, #d4a574, #c77d4a, #e8c4a0, #b86e3a) !important;
+}
+
+.claude-term-label {
+  color: #d4a574 !important;
+}
+
+.claude-prompt-symbol {
+  color: #d4a574 !important;
+}
+
+.claude-header-label {
+  color: #d4a574 !important;
+}
+
+.claude-spinner {
+  border-color: rgba(212, 165, 116, 0.2) !important;
+  border-top-color: #d4a574 !important;
+}
+
+.claude-loading-text {
+  color: #d4a574 !important;
+}
+
+/* ── Settings input ────────────────────────────── */
+
+.settings-input {
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.settings-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.settings-input::placeholder {
+  color: var(--text-muted);
+}
 .app-main {
   flex: 1;
   display: flex;
