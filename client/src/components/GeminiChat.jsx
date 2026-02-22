@@ -55,10 +55,14 @@ function renderForTerminal(text) {
 /* ── Component ────────────────────────────────────────── */
 
 const GeminiChat = forwardRef(function GeminiChat({ model = 'gemini-3-flash-preview', isActive, onStatusChange, onRunCommand }, ref) {
+  const pastedTextRef = useRef(null);
+
   useImperativeHandle(ref, () => ({
     focus: () => inputRef.current?.focus(),
     pasteText: (text) => {
-      setInput(text);
+      const lineCount = text.split('\n').length;
+      pastedTextRef.current = text;
+      setInput(`[Terminal text — ${lineCount} line${lineCount !== 1 ? 's' : ''}]`);
       requestAnimationFrame(() => inputRef.current?.focus());
     },
   }));
@@ -139,7 +143,12 @@ const GeminiChat = forwardRef(function GeminiChat({ model = 'gemini-3-flash-prev
     setCommandHistory((prev) => [text, ...prev].slice(0, 50));
     setHistoryIndex(-1);
 
-    const userEntry = { type: 'user', text };
+    // If this was pasted terminal text, use full text for API but compact display
+    const fullText = pastedTextRef.current ?? text;
+    const displayText = pastedTextRef.current ? text : undefined;
+    pastedTextRef.current = null;
+
+    const userEntry = { type: 'user', text: fullText, ...(displayText && { displayText }) };
     setMessages((prev) => [...prev, userEntry]);
     setInput('');
     setIsLoading(true);
@@ -244,7 +253,7 @@ const GeminiChat = forwardRef(function GeminiChat({ model = 'gemini-3-flash-prev
             {entry.type === 'user' && (
               <>
                 <span className="gemini-term-prompt-symbol">gemini:/&gt;</span>
-                <span className="gemini-term-prompt-text">{entry.text}</span>
+                <span className="gemini-term-prompt-text">{entry.displayText ?? entry.text}</span>
               </>
             )}
             {entry.type === 'model' && (
