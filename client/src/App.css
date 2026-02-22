@@ -1022,7 +1022,7 @@
 }
 
 .gemini-term-info {
-  font-size: 13px;
+  font-size: inherit;
   color: var(--text-secondary);
 }
 
@@ -1032,7 +1032,7 @@
 }
 
 .gemini-term-hint {
-  font-size: 12px;
+  font-size: inherit;
   color: var(--text-muted);
 }
 
@@ -1161,7 +1161,7 @@
 
 .gemini-term-loading-text {
   color: #fbbc04;
-  font-size: 13px;
+  font-size: inherit;
   opacity: 0.8;
   animation: pulse 1.5s ease-in-out infinite;
 }
