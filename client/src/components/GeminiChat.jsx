@@ -198,14 +198,6 @@ const GeminiChat = forwardRef(function GeminiChat({ model = 'gemini-3-flash-prev
         {/* Welcome banner */}
         {messages.length === 0 && !isLoading && (
           <div className="gemini-term-welcome">
-            <div className="gemini-term-ascii">
-{`  ██████╗ ███████╗███╗   ███╗██╗███╗   ██╗██╗
- ██╔════╝ ██╔════╝████╗ ████║██║████╗  ██║██║
- ██║  ███╗█████╗  ██╔████╔██║██║██╔██╗ ██║██║
- ██║   ██║██╔══╝  ██║╚██╔╝██║██║██║╚██╗██║██║
- ╚██████╔╝███████╗██║ ╚═╝ ██║██║██║ ╚████║██║
-  ╚═════╝ ╚══════╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝`}
-            </div>
             <div className="gemini-term-info">
               <span className="gemini-term-label">{model}</span> via Vertex AI
             </div>
