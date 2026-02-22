@@ -112,13 +112,6 @@ const GeminiChat = forwardRef(function GeminiChat({
     onStatusChange('ready');
   }, [onStatusChange]);
 
-  // Auto-send when text is pasted via "Send to Gemini"
-  useEffect(() => {
-    if (autoSendRef.current && input) {
-      autoSendRef.current = false;
-      handleSend();
-    }
-  }, [input, handleSend]);
 
   // Persist chat history to localStorage
   useEffect(() => {
@@ -362,6 +355,14 @@ const GeminiChat = forwardRef(function GeminiChat({
       inputRef.current?.focus();
     }
   }, [input, isLoading, agentRunning, messages, model, agentMode, startAgentLoop]);
+
+  // Auto-send when text is pasted via "Send to Gemini"
+  useEffect(() => {
+    if (autoSendRef.current && input) {
+      autoSendRef.current = false;
+      handleSend();
+    }
+  }, [input, handleSend]);
 
   const handleKeyDown = useCallback(
     (e) => {
