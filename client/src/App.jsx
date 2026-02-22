@@ -236,6 +236,9 @@ function App() {
       : 'disconnected'
     : activeSession?.status || 'disconnected';
 
+  // Gemini features require at least one connected SSH session
+  const hasReadySSH = tabs.some((t) => t.type === 'ssh' && t.status === 'ready');
+
   // In split mode, show active tab on left and a dedicated Gemini on right
   const activeIsGeminiTab = activeSession?.type === 'gemini';
 
@@ -247,14 +250,16 @@ function App() {
           <h1>juni-cli</h1>
         </div>
         <div className="header-right">
-          <button
-            className={`split-toggle ${splitMode ? 'split-toggle--active' : ''}`}
-            onClick={toggleSplit}
-            title={splitMode ? 'Exit split screen' : 'Split screen: Terminal + Gemini'}
-          >
-            <span className="split-toggle-icon">⬡</span>
-            {splitMode ? 'Exit Split' : 'Split'}
-          </button>
+          {hasReadySSH && (
+            <button
+              className={`split-toggle ${splitMode ? 'split-toggle--active' : ''}`}
+              onClick={toggleSplit}
+              title={splitMode ? 'Exit split screen' : 'Split screen: Terminal + Gemini'}
+            >
+              <span className="split-toggle-icon">⬡</span>
+              {splitMode ? 'Exit Split' : 'Split'}
+            </button>
+          )}
           {splitMode && activeSession?.type === 'ssh' && (
             <>
               <button
@@ -275,32 +280,36 @@ function App() {
               </button>
             </>
           )}
-          <select
-            className="model-selector"
-            value={selectedModel}
-            onChange={(e) => setSelectedModel(e.target.value)}
-            title="Select Gemini model"
-          >
-            {GEMINI_MODELS.map((m) => (
-              <option key={m.id} value={m.id}>{m.label}</option>
-            ))}
-          </select>
-          <label className="auto-execute-toggle" title="When enabled, clicking a command will execute it immediately">
-            <input
-              type="checkbox"
-              checked={autoExecute}
-              onChange={(e) => setAutoExecute(e.target.checked)}
-            />
-            <span className="auto-execute-label">Auto-execute</span>
-          </label>
-          <button
-            className={`agent-toggle ${agentMode ? 'agent-toggle--active' : ''}`}
-            onClick={() => setAgentMode((prev) => !prev)}
-            title={agentMode ? 'Disable agent mode' : 'Enable agent mode: Gemini can execute commands autonomously'}
-          >
-            <span className="agent-toggle-icon">⚡</span>
-            {agentMode ? 'Agent ON' : 'Agent'}
-          </button>
+          {hasReadySSH && (
+            <>
+              <select
+                className="model-selector"
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                title="Select Gemini model"
+              >
+                {GEMINI_MODELS.map((m) => (
+                  <option key={m.id} value={m.id}>{m.label}</option>
+                ))}
+              </select>
+              <label className="auto-execute-toggle" title="When enabled, clicking a command will execute it immediately">
+                <input
+                  type="checkbox"
+                  checked={autoExecute}
+                  onChange={(e) => setAutoExecute(e.target.checked)}
+                />
+                <span className="auto-execute-label">Auto-execute</span>
+              </label>
+              <button
+                className={`agent-toggle ${agentMode ? 'agent-toggle--active' : ''}`}
+                onClick={() => setAgentMode((prev) => !prev)}
+                title={agentMode ? 'Disable agent mode' : 'Enable agent mode: Gemini can execute commands autonomously'}
+              >
+                <span className="agent-toggle-icon">⚡</span>
+                {agentMode ? 'Agent ON' : 'Agent'}
+              </button>
+            </>
+          )}
           <div className="settings-wrapper" ref={settingsRef}>
             <button
               className={`settings-gear ${showSettings ? 'settings-gear--active' : ''}`}
@@ -395,14 +404,16 @@ function App() {
             <button className="tab-new" onClick={handleNewTab} title="New SSH connection">
               +
             </button>
-            <button
-              className="tab-new tab-new--gemini"
-              onClick={handleOpenGemini}
-              title="New Gemini chat"
-            >
-              ✦
-            </button>
-            {claudeEnabled && (
+            {hasReadySSH && (
+              <button
+                className="tab-new tab-new--gemini"
+                onClick={handleOpenGemini}
+                title="New Gemini chat"
+              >
+                ✦
+              </button>
+            )}
+            {hasReadySSH && claudeEnabled && (
               <button
                 className="tab-new tab-new--claude"
                 onClick={handleOpenClaude}
