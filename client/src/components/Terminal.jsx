@@ -169,21 +169,23 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
       // Agent sentinel watcher
       if (agentCaptureRef.current) {
         agentCaptureRef.current.buffer += data;
-        // Look for sentinel on its own line (the actual echo output),
-        // not the one embedded in the echoed command line
-        const sentinelLine = '\n' + AGENT_SENTINEL;
-        if (agentCaptureRef.current.buffer.includes(sentinelLine)) {
-          const { buffer, resolve, timer } = agentCaptureRef.current;
+        // Strip ANSI codes first, then look for sentinel on its own line
+        const stripped = agentCaptureRef.current.buffer
+          .replace(/\x1b\[[\?=>!]?[0-9;]*[a-zA-Z]/g, '')
+          .replace(/\x1b\].*?(\x07|\x1b\\)/g, '');
+        // Match sentinel preceded by a line ending (not embedded in the echoed command)
+        const sentinelPattern = /[\r\n]__JUNI_AGENT_DONE__/;
+        const match = sentinelPattern.exec(stripped);
+        if (match) {
+          const { resolve, timer } = agentCaptureRef.current;
           clearTimeout(timer);
           agentCaptureRef.current = null;
-          const stripped = buffer.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
-          const idx = stripped.indexOf(sentinelLine);
-          // Skip the first line (echoed command) and extract actual output
-          const raw = stripped.substring(0, idx);
-          const firstNewline = raw.indexOf('\n');
+          // Extract output between the echoed command (first line) and the sentinel
+          const beforeSentinel = stripped.substring(0, match.index);
+          const firstNewline = beforeSentinel.indexOf('\n');
           const output = firstNewline >= 0
-            ? raw.substring(firstNewline + 1).trim()
-            : raw.trim();
+            ? beforeSentinel.substring(firstNewline + 1).replace(/\r/g, '').trim()
+            : beforeSentinel.replace(/\r/g, '').trim();
           resolve(output);
         }
       }
@@ -192,10 +194,7 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
     socket.on('ssh:status', ({ status }) => {
       onStatusChange(status);
       if (status === 'ready') {
-        // Shell is now open — re-fit and send final dimensions
-        fit.fit();
-        const { cols, rows } = term;
-        socket.emit('ssh:resize', { cols, rows });
+        safeFit();
       }
       if (status === 'disconnected') {
         term.writeln('\r\n\x1b[1;31mConnection closed.\x1b[0m');
