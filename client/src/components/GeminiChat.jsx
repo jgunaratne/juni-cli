@@ -266,6 +266,7 @@ const GeminiChat = forwardRef(function GeminiChat({
     } finally {
       setAgentRunning(false);
       setIsLoading(false);
+      requestAnimationFrame(() => inputRef.current?.focus());
     }
   }, [agentHistory, runAgentStep, executeAgentCommand]);
 
