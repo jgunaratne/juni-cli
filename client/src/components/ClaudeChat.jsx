@@ -166,13 +166,16 @@ const ClaudeChat = forwardRef(function ClaudeChat({ model = 'claude-sonnet-4-202
 
   return (
     <div
-      className="gemini-chat-container claude-chat-container"
+      className="terminal-container"
       style={{ display: isActive ? 'flex' : 'none' }}
     >
-      <div className="gemini-header claude-header">
-        <span className="gemini-header-label claude-header-label">◈ Claude</span>
-        <button className="gemini-clear-btn" onClick={handleClear} title="Clear chat">
-          Clear
+      <div className="terminal-toolbar">
+        <div className="toolbar-left">
+          <span className="gemini-toolbar-icon" style={{ color: '#d4a574' }}>◈</span>
+          <span className="terminal-title">claude — Anthropic API</span>
+        </div>
+        <button className="disconnect-btn" onClick={handleClear}>
+          ⌫ Clear
         </button>
       </div>
 
