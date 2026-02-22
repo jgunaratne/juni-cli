@@ -119,17 +119,24 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
     term.loadAddon(fit);
     term.open(termRef.current);
 
+    // Fit terminal then reduce by one row to prevent bottom clipping
+    const safeFit = () => {
+      fit.fit();
+      const { cols, rows } = term;
+      const safeRows = Math.max(rows - 1, 1);
+      term.resize(cols, safeRows);
+      if (socketRef.current) {
+        socketRef.current.emit('ssh:resize', { cols, rows: safeRows });
+      }
+    };
+
     // ── Fit terminal to container via ResizeObserver ────────
     let resizeTimer;
     const resizeObserver = new ResizeObserver(() => {
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
         try {
-          fit.fit();
-          const { cols, rows } = term;
-          if (socketRef.current) {
-            socketRef.current.emit('ssh:resize', { cols, rows });
-          }
+          safeFit();
         } catch {
           // terminal may be disposed during cleanup
         }
@@ -139,13 +146,7 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
     resizeObserver.observe(termRef.current);
 
     // Initial fit
-    setTimeout(() => {
-      fit.fit();
-      const { cols, rows } = term;
-      if (socketRef.current) {
-        socketRef.current.emit('ssh:resize', { cols, rows });
-      }
-    }, 100);
+    setTimeout(safeFit, 100);
 
     xtermRef.current = term;
     fitRef.current = fit;
@@ -254,13 +255,14 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
   // Refit when terminal becomes visible
   useEffect(() => {
     if (!isActive || !fitRef.current || !xtermRef.current) return;
-    // Delay to allow layout to settle after display changes from none to flex
     const timer = setTimeout(() => {
       try {
         fitRef.current.fit();
         const { cols, rows } = xtermRef.current;
+        const safeRows = Math.max(rows - 1, 1);
+        xtermRef.current.resize(cols, safeRows);
         if (socketRef.current) {
-          socketRef.current.emit('ssh:resize', { cols, rows });
+          socketRef.current.emit('ssh:resize', { cols, rows: safeRows });
         }
       } catch {
         // terminal may be disposed
