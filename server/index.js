@@ -10,6 +10,10 @@ const { VertexAI } = require('@google-cloud/vertexai');
 
 const DEFAULT_PROJECT = process.env.GCP_PROJECT_ID || '';
 const DEFAULT_LOCATION = process.env.GCP_LOCATION || 'us-central1';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+
+// Models that should use the Generative Language API (Google AI) instead of Vertex AI
+const GENAI_MODELS = ['gemini-3-flash-preview'];
 
 /* ── Vertex AI Client Cache ────────────────────────────────── */
 
@@ -21,6 +25,41 @@ function getVertexClient(project, location) {
     clientCache.set(key, new VertexAI({ project, location }));
   }
   return clientCache.get(key);
+}
+
+/* ── Generative Language API (Google AI) Helper ───────────── */
+
+async function callGenAI(model, requestBody) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `Google AI API error: HTTP ${res.status}`);
+  }
+
+  return res.json();
+}
+
+function convertSchemaToGenAI(schema) {
+  if (!schema) return schema;
+  const result = { ...schema };
+  if (result.type) {
+    result.type = result.type.toLowerCase();
+  }
+  if (result.properties) {
+    result.properties = Object.fromEntries(
+      Object.entries(result.properties).map(([key, val]) => [key, convertSchemaToGenAI(val)])
+    );
+  }
+  if (result.items) {
+    result.items = convertSchemaToGenAI(result.items);
+  }
+  return result;
 }
 
 /* ── Express + Socket.io ───────────────────────────────────── */
@@ -62,15 +101,6 @@ app.post('/api/gemini/chat', async (req, res) => {
       location,
     } = req.body;
 
-    const resolvedProject = project || DEFAULT_PROJECT;
-    const resolvedLocation = location || DEFAULT_LOCATION;
-
-    if (!resolvedProject) {
-      return res.status(400).json({
-        error: 'GCP project ID is required. Set GCP_PROJECT_ID in server/.env.',
-      });
-    }
-
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: 'messages array is required' });
     }
@@ -80,21 +110,52 @@ app.post('/api/gemini/chat', async (req, res) => {
       parts: [{ text: m.text }],
     }));
 
-    const vertexAI = getVertexClient(resolvedProject, resolvedLocation);
-    const generativeModel = vertexAI.getGenerativeModel({
-      model,
-      systemInstruction: 'You are a Linux expert. Every time you mention a terminal command, you must wrap it in <cmd> and </cmd> tags. Example: Use <cmd>ls -la</cmd> to list files.',
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 4096,
-      },
-    });
+    let text;
 
-    const result = await generativeModel.generateContent({ contents });
-    const response = result.response;
-    const text =
-      response?.candidates?.[0]?.content?.parts?.[0]?.text ??
-      'No response generated.';
+    if (GENAI_MODELS.includes(model)) {
+      // Use Generative Language API (Google AI)
+      if (!GEMINI_API_KEY) {
+        return res.status(400).json({
+          error: 'GEMINI_API_KEY is required for this model. Set it in server/.env.',
+        });
+      }
+
+      const data = await callGenAI(model, {
+        contents,
+        systemInstruction: {
+          parts: [{ text: 'You are a Linux expert. Every time you mention a terminal command, you must wrap it in <cmd> and </cmd> tags. Example: Use <cmd>ls -la</cmd> to list files.' }],
+        },
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 4096,
+        },
+      });
+
+      text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? 'No response generated.';
+    } else {
+    // Use Vertex AI
+      const resolvedProject = project || DEFAULT_PROJECT;
+      const resolvedLocation = location || DEFAULT_LOCATION;
+
+      if (!resolvedProject) {
+        return res.status(400).json({
+          error: 'GCP project ID is required. Set GCP_PROJECT_ID in server/.env.',
+        });
+      }
+
+      const vertexAI = getVertexClient(resolvedProject, resolvedLocation);
+      const generativeModel = vertexAI.getGenerativeModel({
+        model,
+        systemInstruction: 'You are a Linux expert. Every time you mention a terminal command, you must wrap it in <cmd> and </cmd> tags. Example: Use <cmd>ls -la</cmd> to list files.',
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 4096,
+        },
+      });
+
+      const result = await generativeModel.generateContent({ contents });
+      text = result.response?.candidates?.[0]?.content?.parts?.[0]?.text ?? 'No response generated.';
+    }
 
     res.json({ reply: text });
   } catch (err) {
@@ -217,15 +278,6 @@ app.post('/api/gemini/agent', async (req, res) => {
       location,
     } = req.body;
 
-    const resolvedProject = project || DEFAULT_PROJECT;
-    const resolvedLocation = location || DEFAULT_LOCATION;
-
-    if (!resolvedProject) {
-      return res.status(400).json({
-        error: 'GCP project ID is required. Set GCP_PROJECT_ID in server/.env.',
-      });
-    }
-
     // Build contents from history
     // Each entry is { role: 'user'|'model', parts: [...] }
     // Parts can be: { text }, { functionCall: { name, args } }, { functionResponse: { name, response } }
@@ -238,26 +290,67 @@ app.post('/api/gemini/agent', async (req, res) => {
       return res.status(400).json({ error: 'history is required' });
     }
 
-    const vertexAI = getVertexClient(resolvedProject, resolvedLocation);
-    const generativeModel = vertexAI.getGenerativeModel({
-      model,
-      systemInstruction: AGENT_SYSTEM_PROMPT,
-      tools: AGENT_TOOLS,
-      generationConfig: {
-        temperature: 0.3,
-        maxOutputTokens: 4096,
-      },
-    });
+    let parts;
 
-    const result = await generativeModel.generateContent({ contents });
-    const response = result.response;
-    const candidate = response?.candidates?.[0];
+    if (GENAI_MODELS.includes(model)) {
+      // Use Generative Language API (Google AI)
+      if (!GEMINI_API_KEY) {
+        return res.status(400).json({
+          error: 'GEMINI_API_KEY is required for this model. Set it in server/.env.',
+        });
+      }
 
-    if (!candidate?.content?.parts) {
-      return res.json({ parts: [{ text: 'No response generated.' }] });
+      // Convert tool format: Vertex AI uses TYPE in caps, Google AI uses lowercase
+      const genaiTools = AGENT_TOOLS.map((toolGroup) => ({
+        functionDeclarations: toolGroup.functionDeclarations.map((fn) => ({
+          ...fn,
+          parameters: fn.parameters ? convertSchemaToGenAI(fn.parameters) : undefined,
+        })),
+      }));
+
+      const data = await callGenAI(model, {
+        contents,
+        systemInstruction: {
+          parts: [{ text: AGENT_SYSTEM_PROMPT }],
+        },
+        tools: genaiTools,
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 4096,
+        },
+      });
+
+      const candidate = data?.candidates?.[0];
+      parts = candidate?.content?.parts ?? [{ text: 'No response generated.' }];
+    } else {
+      // Use Vertex AI
+      const resolvedProject = project || DEFAULT_PROJECT;
+      const resolvedLocation = location || DEFAULT_LOCATION;
+
+      if (!resolvedProject) {
+        return res.status(400).json({
+          error: 'GCP project ID is required. Set GCP_PROJECT_ID in server/.env.',
+        });
+      }
+
+      const vertexAI = getVertexClient(resolvedProject, resolvedLocation);
+      const generativeModel = vertexAI.getGenerativeModel({
+        model,
+        systemInstruction: AGENT_SYSTEM_PROMPT,
+        tools: AGENT_TOOLS,
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 4096,
+        },
+      });
+
+      const result = await generativeModel.generateContent({ contents });
+      const response = result.response;
+      const candidate = response?.candidates?.[0];
+      parts = candidate?.content?.parts ?? [{ text: 'No response generated.' }];
     }
 
-    res.json({ parts: candidate.content.parts });
+    res.json({ parts });
   } catch (err) {
     console.error('[gemini-agent] Error:', err);
     const message = err instanceof Error ? err.message : 'Internal server error';
