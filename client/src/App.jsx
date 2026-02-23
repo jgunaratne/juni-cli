@@ -15,6 +15,7 @@ const GEMINI_MODELS = [
 ];
 
 const MONO_FONTS = [
+  { id: 'Ubuntu Mono', label: 'Ubuntu Mono', google: true },
   { id: 'JetBrains Mono', label: 'JetBrains Mono', google: true },
   { id: 'Fira Code', label: 'Fira Code', google: true },
   { id: 'Source Code Pro', label: 'Source Code Pro', google: true },
@@ -22,7 +23,6 @@ const MONO_FONTS = [
   { id: 'IBM Plex Mono', label: 'IBM Plex Mono', google: true },
   { id: 'Space Mono', label: 'Space Mono', google: true },
   { id: 'Roboto Mono', label: 'Roboto Mono', google: true },
-  { id: 'Ubuntu Mono', label: 'Ubuntu Mono', google: true },
 ];
 
 const SETTINGS_KEY = 'juni-cli:settings';
@@ -54,15 +54,16 @@ function App() {
     return s.splitMode ?? false;
   });
   const [splitGeminiStatus, setSplitGeminiStatus] = useState('connecting');
-  const [splitFocus, setSplitFocus] = useState('left'); // 'left' or 'right'
+  const [splitFocus, setSplitFocus] = useState('left');
+  const [splitRatio, setSplitRatio] = useState(50);
   const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
   const [autoExecute, setAutoExecute] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [agentMode, setAgentMode] = useState(false);
 
   const saved = loadSettings();
-  const [fontFamily, setFontFamily] = useState(saved.fontFamily || 'JetBrains Mono');
-  const [fontSize, setFontSize] = useState(saved.fontSize || 14);
+  const [fontFamily, setFontFamily] = useState(saved.fontFamily || 'Ubuntu Mono');
+  const [fontSize, setFontSize] = useState(saved.fontSize || 15);
   const [bgColor, setBgColor] = useState(saved.bgColor || '#0d1117');
 
   const [claudeEnabled, setClaudeEnabled] = useState(saved.claudeEnabled ?? false);
@@ -70,6 +71,8 @@ function App() {
   const terminalRefs = useRef({});
   const splitGeminiRef = useRef(null);
   const settingsRef = useRef(null);
+  const isDragging = useRef(false);
+  const mainRef = useRef(null);
 
   // Load Google Font on mount and when font changes
   useEffect(() => {
@@ -86,6 +89,35 @@ function App() {
     document.documentElement.style.setProperty('--terminal-font-size', `${fontSize}px`);
     document.documentElement.style.setProperty('--terminal-bg', bgColor);
   }, [fontFamily, fontSize, bgColor]);
+
+  const handleDividerMouseDown = useCallback((e) => {
+    e.preventDefault();
+    isDragging.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, []);
+
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isDragging.current || !mainRef.current) return;
+      const rect = mainRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const pct = (x / rect.width) * 100;
+      setSplitRatio(Math.min(Math.max(pct, 15), 85));
+    };
+    const handleMouseUp = () => {
+      if (!isDragging.current) return;
+      isDragging.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
 
   // Close settings when clicking outside
   useEffect(() => {
@@ -477,7 +509,7 @@ function App() {
       )}
 
       {/* ── Content ─────────────────────────────────────── */}
-      <main className={`app-main ${splitMode ? 'app-main--split' : ''}`}>
+      <main className={`app-main ${splitMode ? 'app-main--split' : ''}`} ref={mainRef} style={splitMode ? { '--split-left-width': `${splitRatio}%` } : undefined}>
         {/* Left panel (or full panel when not split) */}
         <div className={`split-panel split-panel--left ${splitMode ? '' : 'split-panel--full'}`}>
           {showForm && <ConnectionForm onConnect={handleConnect} />}
@@ -533,7 +565,7 @@ function App() {
         {/* Right panel — Gemini (only in split mode) */}
         {splitMode && (
           <>
-            <div className="split-divider" />
+            <div className="split-divider" onMouseDown={handleDividerMouseDown} />
             <div className="split-panel split-panel--right">
               <GeminiChat
                 key={SPLIT_GEMINI_ID}
