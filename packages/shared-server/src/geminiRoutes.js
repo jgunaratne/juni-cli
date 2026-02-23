@@ -163,16 +163,19 @@ function createGeminiRoutes({ defaultProject, defaultLocation }) {
 
         const toolPrompt =
           AGENT_SYSTEM_PROMPT + '\n\n' +
+          'CRITICAL RULES:\n' +
+          '1. Respond with EXACTLY ONE action per turn — never multiple.\n' +
+          '2. Output ONLY a single JSON object, no other text before or after it.\n' +
+          '3. Do NOT plan ahead — respond with one action, wait for the result, then decide next.\n\n' +
           'RESPONSE FORMAT:\n' +
-          'You MUST respond with ONLY a single JSON object on the first line, no markdown fences, no extra text.\n' +
-          'To call a tool, respond: {"functionCall":{"name":"TOOL_NAME","args":{...}}}\n' +
-          'To reply with text (no tool), respond: {"text":"your response"}\n\n' +
+          'To call a tool: {"functionCall":{"name":"TOOL_NAME","args":{...}}}\n' +
+          'To reply with text (no tool): {"text":"your response"}\n\n' +
           'Available tools:\n' +
-          '- run_command: {"name":"run_command","args":{"command":"...","reasoning":"..."}}\n' +
-          '- send_keys: {"name":"send_keys","args":{"keys":"...","reasoning":"..."}}\n' +
-          '- task_complete: {"name":"task_complete","args":{"summary":"..."}}\n' +
-          '- ask_user: {"name":"ask_user","args":{"question":"...","reasoning":"..."}}\n' +
-          '- read_terminal: {"name":"read_terminal","args":{"reasoning":"..."}}\n';
+          '- run_command: args: command, reasoning\n' +
+          '- send_keys: args: keys, reasoning\n' +
+          '- task_complete: args: summary\n' +
+          '- ask_user: args: question, reasoning\n' +
+          '- read_terminal: args: reasoning\n';
 
         const response = await client.models.generateContent({
           model,
@@ -187,19 +190,35 @@ function createGeminiRoutes({ defaultProject, defaultLocation }) {
         const responseText = response?.text || response?.candidates?.[0]?.content?.parts?.[0]?.text || '';
         console.log('[gemini-agent] prompt-based response:', responseText?.slice(0, 300));
 
+        // Extract the FIRST complete JSON object using bracket counting
+        function extractFirstJSON(str) {
+          let depth = 0;
+          let start = -1;
+          for (let i = 0; i < str.length; i++) {
+            if (str[i] === '{') {
+              if (depth === 0) start = i;
+              depth++;
+            } else if (str[i] === '}') {
+              depth--;
+              if (depth === 0 && start >= 0) {
+                return str.slice(start, i + 1);
+              }
+            }
+          }
+          return null;
+        }
+
         // Parse JSON response into parts format
         try {
-          // Strip markdown fences and [TOOL_CALL] prefix
           let cleaned = responseText.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
           cleaned = cleaned.replace(/^\[TOOL_CALL\]\s*/i, '');
-          // Extract first JSON object
-          const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-          const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : cleaned);
+          const jsonStr = extractFirstJSON(cleaned);
+          if (!jsonStr) throw new Error('No JSON found');
+          const parsed = JSON.parse(jsonStr);
 
           if (parsed.functionCall) {
             parts = [{ functionCall: parsed.functionCall }];
           } else if (parsed.name && parsed.args) {
-            // Model responded with direct {name, args} format
             parts = [{ functionCall: { name: parsed.name, args: parsed.args } }];
           } else if (parsed.text) {
             parts = [{ text: parsed.text }];

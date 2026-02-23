@@ -470,6 +470,43 @@
   color: var(--text-secondary);
 }
 
+.settings-radio-group {
+  display: flex;
+  gap: 6px;
+}
+
+.settings-radio {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex: 1;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.settings-radio input[type="radio"] {
+  display: none;
+}
+
+.settings-radio:hover {
+  border-color: var(--accent);
+  color: var(--text-secondary);
+}
+
+.settings-radio--active {
+  border-color: var(--accent);
+  background: rgba(251, 188, 4, 0.1);
+  color: var(--accent);
+}
 .settings-preview {
   padding: 10px;
   background: var(--bg-primary);
@@ -753,7 +790,9 @@
   border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
   cursor: pointer;
   transition: background 0.2s, color 0.2s;
   white-space: nowrap;
@@ -775,6 +814,9 @@
   flex-direction: row;
 }
 
+.app-main--split-vertical {
+  flex-direction: column;
+}
 /* ─── Split panels ────────────────────────────────────────── */
 
 .split-panel {
@@ -790,7 +832,7 @@
 
 .app-main--split .split-panel--left {
   flex: none;
-    width: var(--split-left-width, 50%);
+  width: var(--split-ratio, 50%);
     min-width: 200px;
 }
 
@@ -799,18 +841,36 @@
   min-width: 200px;
 }
 
+/* Vertical layout overrides */
+.app-main--split-vertical .split-panel--left {
+  width: 100%;
+  height: var(--split-ratio, 50%);
+  min-width: 0;
+  min-height: 100px;
+}
+
+.app-main--split-vertical .split-panel--right {
+  width: 100%;
+  min-width: 0;
+  min-height: 100px;
+}
 .split-divider {
   width: 5px;
   background: var(--border);
   flex-shrink: 0;
   position: relative;
   cursor: col-resize;
-    transition: background 0.15s;
+  transition: background 0.15s;
   }
-  
-  .split-divider:hover,
-  .split-divider.dragging {
-    background: var(--accent);
+.app-main--split-vertical .split-divider {
+  width: 100%;
+  height: 5px;
+  cursor: row-resize;
+}
+
+.split-divider:hover,
+.split-divider.dragging {
+  background: var(--accent);
 }
 
 .split-divider::after {

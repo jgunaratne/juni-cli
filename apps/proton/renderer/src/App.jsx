@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { ConnectionForm, Terminal, GeminiChat, ClaudeChat } from '@juni/shared-ui';
+import { ConnectionForm, Terminal, GeminiChat } from '@juni/shared-ui';
 
 import './App.css';
 
@@ -50,8 +50,12 @@ function App() {
   const [activeTab, setActiveTab] = useState(null);
   const [showForm, setShowForm] = useState(true);
   const [splitMode, setSplitMode] = useState(() => {
-    const s = loadSettings();
+    const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
     return s.splitMode ?? false;
+  });
+  const [splitLayout, setSplitLayout] = useState(() => {
+    const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+    return s.splitLayout ?? 'horizontal';
   });
   const [splitGeminiStatus, setSplitGeminiStatus] = useState('connecting');
   const [splitFocus, setSplitFocus] = useState('left');
@@ -67,7 +71,7 @@ function App() {
   const [fontFamily, setFontFamily] = useState(saved.fontFamily || 'Ubuntu Mono');
   const [fontSize, setFontSize] = useState(saved.fontSize || 15);
   const [bgColor, setBgColor] = useState(saved.bgColor || '#0d1117');
-  const [claudeEnabled, setClaudeEnabled] = useState(saved.claudeEnabled ?? false);
+
 
   const terminalRefs = useRef({});
   const splitGeminiRef = useRef(null);
@@ -95,8 +99,8 @@ function App() {
   }, [fontFamily]);
 
   useEffect(() => {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ fontFamily, fontSize, bgColor, claudeEnabled, splitMode }));
-  }, [fontFamily, fontSize, bgColor, claudeEnabled, splitMode]);
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ fontFamily, fontSize, bgColor, splitMode, splitLayout }));
+  }, [fontFamily, fontSize, bgColor, splitMode, splitLayout]);
 
   useEffect(() => {
     document.documentElement.style.setProperty('--terminal-font', `'${fontFamily}', monospace`);
@@ -107,16 +111,22 @@ function App() {
   const handleDividerMouseDown = useCallback((e) => {
     e.preventDefault();
     isDragging.current = true;
-    document.body.style.cursor = 'col-resize';
+    document.body.style.cursor = splitLayout === 'vertical' ? 'row-resize' : 'col-resize';
     document.body.style.userSelect = 'none';
-  }, []);
+  }, [splitLayout]);
 
   useEffect(() => {
     const handleMouseMove = (e) => {
       if (!isDragging.current || !mainRef.current) return;
       const rect = mainRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const pct = (x / rect.width) * 100;
+      let pct;
+      if (splitLayout === 'vertical') {
+        const y = e.clientY - rect.top;
+        pct = (y / rect.height) * 100;
+      } else {
+        const x = e.clientX - rect.left;
+        pct = (x / rect.width) * 100;
+      }
       setSplitRatio(Math.min(Math.max(pct, 15), 85));
     };
     const handleMouseUp = () => {
@@ -131,7 +141,7 @@ function App() {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, []);
+  }, [splitLayout]);
 
   useEffect(() => {
     if (!showSettings) return;
@@ -196,13 +206,7 @@ function App() {
     setShowForm(false);
   }, []);
 
-  const handleOpenClaude = useCallback(() => {
-    const id = nextId++;
-    const newTab = { id, type: 'claude', status: 'connecting' };
-    setTabs((prev) => [...prev, newTab]);
-    setActiveTab(id);
-    setShowForm(false);
-  }, []);
+
 
   const handleStatusChange = useCallback((tabId, newStatus) => {
     setTabs((prev) =>
@@ -346,10 +350,10 @@ function App() {
             <button
               className={`split-toggle ${splitMode ? 'split-toggle--active' : ''}`}
               onClick={toggleSplit}
-              title={splitMode ? 'Exit split screen' : 'Split screen: Terminal + Gemini'}
+              title={splitMode ? 'Hide Gemini panel' : 'Show Gemini panel'}
             >
               <span className="split-toggle-icon">⬡</span>
-              {splitMode ? 'Exit Split' : 'Split'}
+              {splitMode ? 'Hide Gemini' : 'Show Gemini'}
             </button>
           )}
           {splitMode && activeSession?.type === 'ssh' && (
@@ -472,18 +476,32 @@ function App() {
                     </button>
                   </div>
                 </div>
-                <label className="settings-toggle">
-                  <input
-                    type="checkbox"
-                    checked={claudeEnabled}
-                    onChange={(e) => setClaudeEnabled(e.target.checked)}
-                  />
-                  <span className="settings-toggle-label">Enable Claude</span>
-                </label>
 
 
-                <div className="settings-preview" style={{ fontFamily: `'${fontFamily}', monospace`, fontSize: `${fontSize}px` }}>
-                  The quick brown fox jumps over the lazy dog
+                <div className="settings-group">
+                  <label className="settings-label">Split Layout</label>
+                  <div className="settings-radio-group">
+                    <label className={`settings-radio ${splitLayout === 'horizontal' ? 'settings-radio--active' : ''}`}>
+                      <input
+                        type="radio"
+                        name="splitLayout"
+                        value="horizontal"
+                        checked={splitLayout === 'horizontal'}
+                        onChange={() => setSplitLayout('horizontal')}
+                      />
+                      ◧ Left / Right
+                    </label>
+                    <label className={`settings-radio ${splitLayout === 'vertical' ? 'settings-radio--active' : ''}`}>
+                      <input
+                        type="radio"
+                        name="splitLayout"
+                        value="vertical"
+                        checked={splitLayout === 'vertical'}
+                        onChange={() => setSplitLayout('vertical')}
+                      />
+                      ⬒ Top / Bottom
+                    </label>
+                  </div>
                 </div>
               </div>
             )}
@@ -501,13 +519,11 @@ function App() {
           {tabs.map((tab) => (
             <div
               key={tab.id}
-              className={`tab ${tab.id === activeTab && !showForm ? 'active' : ''} ${tab.type === 'gemini' ? 'tab--gemini' : ''} ${tab.type === 'claude' ? 'tab--claude' : ''}`}
+              className={`tab ${tab.id === activeTab && !showForm ? 'active' : ''} ${tab.type === 'gemini' ? 'tab--gemini' : ''}`}
               onClick={() => switchTab(tab.id)}
             >
               {tab.type === 'gemini' ? (
                 <span className="tab-gemini-icon">✦</span>
-              ) : tab.type === 'claude' ? (
-                <span className="tab-gemini-icon" style={{ color: '#d4a574' }}>◈</span>
               ) : (
                 <span className={`tab-status-dot ${tab.status}`} />
               )}
@@ -541,21 +557,13 @@ function App() {
                 ✦
               </button>
             )}
-            {hasReadySSH && claudeEnabled && (
-              <button
-                className="tab-new tab-new--claude"
-                onClick={handleOpenClaude}
-                title="New Claude chat"
-              >
-                ◈
-              </button>
-            )}
+
           </div>
         </div>
       )}
 
       {/* ── Content ─────────────────────────────────────── */}
-      <main className={`app-main ${splitMode ? 'app-main--split' : ''}`} ref={mainRef} style={splitMode ? { '--split-left-width': `${splitRatio}%` } : undefined}>
+      <main className={`app-main ${splitMode ? `app-main--split app-main--split-${splitLayout}` : ''}`} ref={mainRef} style={splitMode ? { '--split-ratio': `${splitRatio}%` } : undefined}>
         {/* Left panel (or full panel when not split) */}
         <div className={`split-panel split-panel--left ${splitMode ? '' : 'split-panel--full'}`}>
           {showForm && <ConnectionForm onConnect={handleConnect} onLocalConnect={handleLocalConnect} />}
@@ -600,18 +608,7 @@ function App() {
                   stepThrough={stepThrough}
                     serverUrl={serverUrl}
                 />
-              )
-            ) : tab.type === 'claude' ? (
-              !splitMode && (
-                <ClaudeChat
-                  key={tab.id}
-                  isActive={tab.id === activeTab && !showForm}
-                  onStatusChange={(status) => handleStatusChange(tab.id, status)}
-                  onClose={() => handleCloseTab(tab.id)}
-                  onRunCommand={handleRunCommand}
-                  serverUrl={serverUrl}
-                />
-              )
+                )
             ) : null,
           )}
         </div>
