@@ -1,7 +1,8 @@
 {
   "name": "juni-cli-proton",
   "version": "1.0.0",
-  "description": "juni-cli native macOS desktop application built on Electron",
+  "description": "Agentic CLI desktop application",
+  "author": "Junius Gunaratne <junius@gunaratne.com>",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
