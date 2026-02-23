@@ -2,6 +2,28 @@ const express = require('express');
 const { getVertexClient, getGeminiClient, GENAI_MODELS } = require('./vertexClient');
 const { AGENT_TOOLS, AGENT_SYSTEM_PROMPT } = require('./agentTools');
 
+/**
+ * Convert tool schemas from Vertex AI format (uppercase types)
+ * to @google/genai format (lowercase types).
+ */
+function convertSchemaValue(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(convertSchemaValue);
+  const result = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (key === 'type' && typeof value === 'string') {
+      result[key] = value.toLowerCase();
+    } else {
+      result[key] = convertSchemaValue(value);
+    }
+  }
+  return result;
+}
+
+function convertToolsForGenAI(tools) {
+  return convertSchemaValue(tools);
+}
+
 function createGeminiRoutes({ defaultProject, defaultLocation }) {
   const router = express.Router();
 
@@ -27,11 +49,6 @@ function createGeminiRoutes({ defaultProject, defaultLocation }) {
         });
       }
 
-      const contents = messages.map((m) => ({
-        role: m.role === 'model' ? 'model' : 'user',
-        parts: [{ text: m.text }],
-      }));
-
       let text;
 
       if (GENAI_MODELS.includes(model)) {
@@ -39,7 +56,10 @@ function createGeminiRoutes({ defaultProject, defaultLocation }) {
         const client = getGeminiClient(resolvedProject, resolvedLocation);
         const response = await client.models.generateContent({
           model,
-          contents,
+          contents: messages.map((m) => ({
+            role: m.role === 'user' ? 'user' : 'model',
+            parts: [{ text: m.text }],
+          })),
           config: {
             systemInstruction: 'You are a Linux expert. Every time you mention a terminal command, you must wrap it in <cmd> and </cmd> tags. Example: Use <cmd>ls -la</cmd> to list files.',
             temperature: 0.7,
@@ -47,26 +67,48 @@ function createGeminiRoutes({ defaultProject, defaultLocation }) {
           },
         });
 
-        text = response?.text ?? 'No response generated.';
+        // Extract text: try .text getter first, fall back to candidates
+        try {
+          text = response?.text;
+        } catch (e) {
+          console.log('[gemini-chat] response.text error:', e.message);
+        }
+
+        if (!text) {
+          const candidateText = response?.candidates?.[0]?.content?.parts
+            ?.filter((p) => p.text)
+            ?.map((p) => p.text)
+            ?.join('');
+          text = candidateText || null;
+        }
+
+        if (!text) {
+          console.log('[gemini-chat] Empty response from', model, '- finishReason:', response?.candidates?.[0]?.finishReason);
+          text = 'The model returned an empty response. Please try again.';
+        }
       } else {
         // Legacy models → @google-cloud/vertexai
         const vertexAI = getVertexClient(resolvedProject, resolvedLocation);
         const generativeModel = vertexAI.getGenerativeModel({
           model,
           systemInstruction: 'You are a Linux expert. Every time you mention a terminal command, you must wrap it in <cmd> and </cmd> tags. Example: Use <cmd>ls -la</cmd> to list files.',
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 4096,
-          },
+          generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
         });
 
+        const contents = messages.map((m) => ({
+          role: m.role === 'user' ? 'user' : 'model',
+          parts: [{ text: m.text }],
+        }));
+
         const result = await generativeModel.generateContent({ contents });
-        text = result.response?.candidates?.[0]?.content?.parts?.[0]?.text ?? 'No response generated.';
+        const response = result.response;
+        text = response?.candidates?.[0]?.content?.parts?.[0]?.text ?? 'No response generated.';
       }
 
+      console.log('[gemini-chat]', model, '→', text?.slice(0, 100));
       res.json({ reply: text });
     } catch (err) {
-      console.error('[gemini] Chat error:', err);
+      console.error('[gemini-chat] Error:', err);
       const message = err instanceof Error ? err.message : 'Internal server error';
       res.status(500).json({ error: message });
     }
@@ -81,6 +123,9 @@ function createGeminiRoutes({ defaultProject, defaultLocation }) {
         location,
       } = req.body;
 
+      const resolvedProject = project || defaultProject;
+      const resolvedLocation = location || defaultLocation;
+
       const contents = history.map((entry) => ({
         role: entry.role,
         parts: entry.parts,
@@ -89,9 +134,6 @@ function createGeminiRoutes({ defaultProject, defaultLocation }) {
       if (contents.length === 0) {
         return res.status(400).json({ error: 'history is required' });
       }
-
-      const resolvedProject = project || defaultProject;
-      const resolvedLocation = location || defaultLocation;
 
       if (!resolvedProject) {
         return res.status(400).json({
@@ -102,21 +144,72 @@ function createGeminiRoutes({ defaultProject, defaultLocation }) {
       let parts;
 
       if (GENAI_MODELS.includes(model)) {
-        // Gemini 3 models → @google/genai via Vertex AI
+        // Gemini 3 preview: use prompt-based tool calling (native function calling is unreliable)
         const client = getGeminiClient(resolvedProject, resolvedLocation);
+
+        // Convert history: replace functionCall/functionResponse with text equivalents
+        const promptContents = contents.map((entry) => {
+          const newParts = entry.parts.map((p) => {
+            if (p.functionCall) {
+              return { text: `[TOOL_CALL] ${JSON.stringify(p.functionCall)}` };
+            }
+            if (p.functionResponse) {
+              return { text: `[TOOL_RESULT] ${JSON.stringify(p.functionResponse)}` };
+            }
+            return p;
+          });
+          return { role: entry.role, parts: newParts };
+        });
+
+        const toolPrompt =
+          AGENT_SYSTEM_PROMPT + '\n\n' +
+          'RESPONSE FORMAT:\n' +
+          'You MUST respond with ONLY a single JSON object on the first line, no markdown fences, no extra text.\n' +
+          'To call a tool, respond: {"functionCall":{"name":"TOOL_NAME","args":{...}}}\n' +
+          'To reply with text (no tool), respond: {"text":"your response"}\n\n' +
+          'Available tools:\n' +
+          '- run_command: {"name":"run_command","args":{"command":"...","reasoning":"..."}}\n' +
+          '- send_keys: {"name":"send_keys","args":{"keys":"...","reasoning":"..."}}\n' +
+          '- task_complete: {"name":"task_complete","args":{"summary":"..."}}\n' +
+          '- ask_user: {"name":"ask_user","args":{"question":"...","reasoning":"..."}}\n' +
+          '- read_terminal: {"name":"read_terminal","args":{"reasoning":"..."}}\n';
+
         const response = await client.models.generateContent({
           model,
-          contents,
+          contents: promptContents,
           config: {
-            systemInstruction: AGENT_SYSTEM_PROMPT,
+            systemInstruction: toolPrompt,
             temperature: 0.3,
             maxOutputTokens: 4096,
           },
-          tools: AGENT_TOOLS,
         });
 
-        const candidate = response?.candidates?.[0];
-        parts = candidate?.content?.parts ?? [{ text: 'No response generated.' }];
+        const responseText = response?.text || response?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        console.log('[gemini-agent] prompt-based response:', responseText?.slice(0, 300));
+
+        // Parse JSON response into parts format
+        try {
+          // Strip markdown fences and [TOOL_CALL] prefix
+          let cleaned = responseText.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
+          cleaned = cleaned.replace(/^\[TOOL_CALL\]\s*/i, '');
+          // Extract first JSON object
+          const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+          const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : cleaned);
+
+          if (parsed.functionCall) {
+            parts = [{ functionCall: parsed.functionCall }];
+          } else if (parsed.name && parsed.args) {
+            // Model responded with direct {name, args} format
+            parts = [{ functionCall: { name: parsed.name, args: parsed.args } }];
+          } else if (parsed.text) {
+            parts = [{ text: parsed.text }];
+          } else {
+            parts = [{ text: responseText }];
+          }
+        } catch {
+          // Not valid JSON — treat as plain text response
+          parts = [{ text: responseText || 'The model returned an empty response. Please try again.' }];
+        }
       } else {
         // Legacy models → @google-cloud/vertexai
         const vertexAI = getVertexClient(resolvedProject, resolvedLocation);

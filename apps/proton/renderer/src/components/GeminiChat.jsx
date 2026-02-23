@@ -38,11 +38,17 @@ async function callGemini(serverUrl, model, messages) {
 }
 
 async function callGeminiAgent(serverUrl, model, history, signal) {
+  // 30-second timeout to prevent indefinite hangs
+  const timeout = AbortSignal.timeout(30000);
+  const combinedSignal = signal
+    ? AbortSignal.any([signal, timeout])
+    : timeout;
+
   const res = await fetch(`${serverUrl}/api/gemini/agent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ model, history }),
-    signal,
+    signal: combinedSignal,
   });
 
   if (!res.ok) {
@@ -117,6 +123,8 @@ const GeminiChat = forwardRef(function GeminiChat({
   const [agentSteps, setAgentSteps] = useState([]);
   const [pendingCommand, setPendingCommand] = useState(null);
   const [agentRunning, setAgentRunning] = useState(false);
+  const [agentStepNum, setAgentStepNum] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [agentPaused, setAgentPaused] = useState(false);
   const [agentStopping, setAgentStopping] = useState(false);
   const [agentQuestion, setAgentQuestion] = useState(null);
@@ -155,6 +163,19 @@ const GeminiChat = forwardRef(function GeminiChat({
       requestAnimationFrame(() => inputRef.current?.focus());
     }
   }, [isActive]);
+
+  // Elapsed timer for loading indicator
+  useEffect(() => {
+    if (!isLoading) {
+      setElapsedSeconds(0);
+      return;
+    }
+    setElapsedSeconds(0);
+    const interval = setInterval(() => {
+      setElapsedSeconds((s) => s + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isLoading]);
 
   /* ── Agent loop ──────────────────────────────────────── */
 
@@ -195,7 +216,7 @@ const GeminiChat = forwardRef(function GeminiChat({
     return { type: 'text', text: 'No response generated.', parts: [{ text: 'No response generated.' }] };
   }, [serverUrl, model]);
 
-  const executeAgentCommand = useCallback(async (command, reasoning, currentHistory) => {
+  const executeAgentCommand = useCallback(async (command, reasoning, currentHistory, originalParts) => {
     setAgentSteps((prev) => [...prev, {
       type: 'command',
       command,
@@ -228,9 +249,10 @@ const GeminiChat = forwardRef(function GeminiChat({
     }
 
     const truncatedOutput = smartTruncate(output);
+    // Use original parts (preserves thoughtSignature for Gemini 3)
     const modelEntry = {
       role: 'model',
-      parts: [{ functionCall: { name: 'run_command', args: { command, reasoning } } }],
+      parts: originalParts || [{ functionCall: { name: 'run_command', args: { command, reasoning } } }],
     };
     const functionResponseEntry = {
       role: 'user',
@@ -240,7 +262,7 @@ const GeminiChat = forwardRef(function GeminiChat({
     return [...currentHistory, modelEntry, functionResponseEntry];
   }, [onRunAgentCommand]);
 
-  const executeAgentSendKeys = useCallback(async (keys, reasoning, currentHistory) => {
+  const executeAgentSendKeys = useCallback(async (keys, reasoning, currentHistory, originalParts) => {
     setAgentSteps((prev) => [...prev, {
       type: 'send_keys',
       keys,
@@ -264,9 +286,10 @@ const GeminiChat = forwardRef(function GeminiChat({
     ));
 
     const truncatedOutput = smartTruncate(output);
+    // Use original parts (preserves thoughtSignature for Gemini 3)
     const modelEntry = {
       role: 'model',
-      parts: [{ functionCall: { name: 'send_keys', args: { keys, reasoning } } }],
+      parts: originalParts || [{ functionCall: { name: 'send_keys', args: { keys, reasoning } } }],
     };
     const functionResponseEntry = {
       role: 'user',
@@ -316,6 +339,7 @@ const GeminiChat = forwardRef(function GeminiChat({
     pausedResolverRef.current = null;
     lastAgentPromptRef.current = userText;
     setAgentRunning(true);
+    setAgentStepNum(0);
     setAgentSteps([]);
     setPendingCommand(null);
     setPendingApproval(null);
@@ -350,6 +374,7 @@ const GeminiChat = forwardRef(function GeminiChat({
         }
 
         setIsLoading(true);
+        setAgentStepNum(i + 1);
         const result = await runAgentStep(history, controller.signal);
         setIsLoading(false);
 
@@ -462,7 +487,7 @@ const GeminiChat = forwardRef(function GeminiChat({
               continue;
             }
           }
-          history = await executeAgentCommand(result.command, result.reasoning, history);
+          history = await executeAgentCommand(result.command, result.reasoning, history, result.parts);
           setAgentHistory(history);
         }
 
@@ -490,7 +515,7 @@ const GeminiChat = forwardRef(function GeminiChat({
               continue;
             }
           }
-          history = await executeAgentSendKeys(result.keys, result.reasoning, history);
+          history = await executeAgentSendKeys(result.keys, result.reasoning, history, result.parts);
           setAgentHistory(history);
         }
       }
@@ -971,8 +996,13 @@ const GeminiChat = forwardRef(function GeminiChat({
           <div className="gemini-term-line gemini-term-line--loading">
             <span className="gemini-term-spinner" />
             <span className="gemini-term-loading-text">
-              {agentRunning ? 'agent thinking…' : 'thinking…'}
+              {agentRunning
+                ? `${model} · step ${agentStepNum} · thinking… ${elapsedSeconds}s`
+                : `${model} · thinking… ${elapsedSeconds}s`}
             </span>
+            {agentRunning && (
+              <button className="agent-step-stop-btn" onClick={stopAgent} title="Stop agent">✕</button>
+            )}
           </div>
         )}
 
