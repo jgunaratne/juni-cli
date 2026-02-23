@@ -198,6 +198,28 @@ const GeminiChat = forwardRef(function GeminiChat({
     }
 
     if (textPart) {
+      // Sometimes the model returns a function call as plain-text JSON instead of
+      // a proper functionCall part. Detect and parse it so it renders correctly.
+      const trimmed = textPart.text.trim();
+      if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (parsed.task_complete) {
+            return { type: 'complete', summary: parsed.task_complete.summary || JSON.stringify(parsed.task_complete), parts };
+          }
+          if (parsed.run_command) {
+            return { type: 'command', command: parsed.run_command.command, reasoning: parsed.run_command.reasoning || '', parts };
+          }
+          if (parsed.send_keys) {
+            return { type: 'send_keys', keys: parsed.send_keys.keys, reasoning: parsed.send_keys.reasoning || '', parts };
+          }
+          if (parsed.ask_user) {
+            return { type: 'ask_user', question: parsed.ask_user.question, reasoning: parsed.ask_user.reasoning || '', parts };
+          }
+        } catch {
+          // Not valid JSON, fall through to display as text
+        }
+      }
       return { type: 'text', text: textPart.text, parts };
     }
 
