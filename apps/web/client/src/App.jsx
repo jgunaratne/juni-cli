@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { ConnectionForm, Terminal, GeminiChat, ClaudeChat } from '@juni/shared-ui';
+import { ConnectionForm, Terminal, GeminiChat } from '@juni/shared-ui';
 
 import './App.css';
 
@@ -184,13 +184,7 @@ function App() {
     setShowForm(false);
   }, []);
 
-  const handleOpenClaude = useCallback(() => {
-    const id = nextId++;
-    const newTab = { id, type: 'claude', status: 'connecting' };
-    setTabs((prev) => [...prev, newTab]);
-    setActiveTab(id);
-    setShowForm(false);
-  }, []);
+
 
   const handleStatusChange = useCallback((tabId, newStatus) => {
     setTabs((prev) =>
@@ -293,7 +287,6 @@ function App() {
 
   const getTabLabel = (tab) => {
     if (tab.type === 'gemini') return 'Gemini';
-    if (tab.type === 'claude') return 'Claude';
     return `${tab.connection.username}@${tab.connection.host}`;
   };
 
@@ -491,13 +484,11 @@ function App() {
           {tabs.map((tab) => (
             <div
               key={tab.id}
-              className={`tab ${tab.id === activeTab && !showForm ? 'active' : ''} ${tab.type === 'gemini' ? 'tab--gemini' : ''} ${tab.type === 'claude' ? 'tab--claude' : ''}`}
+              className={`tab ${tab.id === activeTab && !showForm ? 'active' : ''} ${tab.type === 'gemini' ? 'tab--gemini' : ''}`}
               onClick={() => switchTab(tab.id)}
             >
               {tab.type === 'gemini' ? (
                 <span className="tab-gemini-icon">✦</span>
-              ) : tab.type === 'claude' ? (
-                <span className="tab-gemini-icon" style={{ color: '#d4a574' }}>◈</span>
               ) : (
                 <span className={`tab-status-dot ${tab.status}`} />
               )}
@@ -529,15 +520,6 @@ function App() {
                 title="New Gemini chat"
               >
                 ✦
-              </button>
-            )}
-            {hasReadySSH && (
-              <button
-                className="tab-new tab-new--claude"
-                onClick={handleOpenClaude}
-                title="New Claude chat"
-              >
-                ◈
               </button>
             )}
           </div>
@@ -591,18 +573,7 @@ function App() {
                   }}
                   stepThrough={stepThrough}
                 />
-              )
-            ) : tab.type === 'claude' ? (
-              !splitMode && (
-                <ClaudeChat
-                  key={tab.id}
-                  isActive={tab.id === activeTab && !showForm}
-                  onStatusChange={(status) => handleStatusChange(tab.id, status)}
-                  onClose={() => handleCloseTab(tab.id)}
-                  onRunCommand={handleRunCommand}
-                  serverUrl={SERVER_URL}
-                />
-              )
+                )
             ) : null,
           )}
         </div>

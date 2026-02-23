@@ -1069,6 +1069,7 @@
   background: var(--terminal-bg, #0d1117);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  font-family: 'Inter', sans-serif;
 }
 
 .toolbar-left {
@@ -1078,7 +1079,6 @@
 }
 
 .terminal-title {
-  font-family: 'Ubuntu Mono', monospace;
   font-size: 12px;
   color: var(--text-secondary);
 }
@@ -1093,7 +1093,6 @@
   border: 1px solid rgba(255, 123, 114, 0.3);
   border-radius: 6px;
   color: var(--red);
-  font-family: 'Ubuntu Mono', monospace;
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
@@ -1384,7 +1383,7 @@
   border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--text-muted);
-  font-family: 'Ubuntu Mono', monospace;
+  font-family: 'Inter', sans-serif;
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
