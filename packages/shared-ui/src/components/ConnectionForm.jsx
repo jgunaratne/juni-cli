@@ -118,23 +118,27 @@ export default function ConnectionForm({ onConnect, onLocalConnect }) {
   return (
     <div className="connection-form-wrapper">
       <div className="connection-form-container">
-        {/* ── Local Terminal ────────────────────────── */}
-        <button
-          type="button"
-          className="local-terminal-btn"
-          onClick={onLocalConnect}
-        >
-          <span className="local-terminal-icon">⬡</span>
-          <div className="local-terminal-text">
-            <span className="local-terminal-title">Local Terminal</span>
-            <span className="local-terminal-sub">Open a shell on this Mac — no login required</span>
-          </div>
-          <span className="local-terminal-arrow">→</span>
-        </button>
+        {/* ── Local Terminal (Proton only) ─────────── */}
+        {onLocalConnect && (
+          <>
+            <button
+              type="button"
+              className="local-terminal-btn"
+              onClick={onLocalConnect}
+            >
+              <span className="local-terminal-icon">⬡</span>
+              <div className="local-terminal-text">
+                <span className="local-terminal-title">Local Terminal</span>
+                <span className="local-terminal-sub">Open a shell on this Mac — no login required</span>
+              </div>
+              <span className="local-terminal-arrow">→</span>
+            </button>
 
-        <div className="form-divider">
-          <span className="form-divider-text">or connect via SSH</span>
-        </div>
+            <div className="form-divider">
+              <span className="form-divider-text">or connect via SSH</span>
+            </div>
+          </>
+        )}
 
         {/* ── SSH Connection Form ───────────────────── */}
         <form className="connection-form" onSubmit={handleSubmit}>
