@@ -57,6 +57,18 @@ async function callGeminiAgent(model, history, signal) {
   return data.parts ?? [{ text: 'No response generated.' }];
 }
 
+/* ── Smart truncation: keep first + last lines ───────── */
+
+function smartTruncate(text, maxChars = 2000, headLines = 30, tailLines = 30) {
+  if (text.length <= maxChars) return text;
+  const lines = text.split('\n');
+  if (lines.length <= headLines + tailLines) return text;
+  const head = lines.slice(0, headLines);
+  const tail = lines.slice(-tailLines);
+  const omitted = lines.length - headLines - tailLines;
+  return [...head, `\n--- (${omitted} lines omitted) ---\n`, ...tail].join('\n');
+}
+
 /* ── Simple markdown → ANSI-style terminal rendering ── */
 
 function renderForTerminal(text) {
@@ -81,6 +93,8 @@ const GeminiChat = forwardRef(function GeminiChat({
   onRunAgentCommand,
   onSendAgentKeys,
   onAbortAgentCapture,
+  onReadTerminal,
+  stepThrough = false,
 }, ref) {
   const pastedTextRef = useRef(null);
   const autoSendRef = useRef(false);
@@ -101,17 +115,21 @@ const GeminiChat = forwardRef(function GeminiChat({
   const [commandHistory, setCommandHistory] = useState(loadCmdHistory);
   const [historyIndex, setHistoryIndex] = useState(-1);
 
-  // Agent-specific state
-  const [agentHistory, setAgentHistory] = useState([]); // Vertex AI conversation history
-  const [agentSteps, setAgentSteps] = useState([]); // { type, command?, reasoning?, output?, summary?, status }
-  const [pendingCommand, setPendingCommand] = useState(null); // { command, reasoning } awaiting confirmation
+  const [agentHistory, setAgentHistory] = useState([]);
+  const [agentSteps, setAgentSteps] = useState([]);
+  const [pendingCommand, setPendingCommand] = useState(null);
   const [agentRunning, setAgentRunning] = useState(false);
   const [agentPaused, setAgentPaused] = useState(false);
   const [agentStopping, setAgentStopping] = useState(false);
+  const [agentQuestion, setAgentQuestion] = useState(null);
+  const [agentQuestionInput, setAgentQuestionInput] = useState('');
+  const [pendingApproval, setPendingApproval] = useState(null);
   const abortAgentRef = useRef(false);
-  const abortControllerRef = useRef(null); // AbortController for in-flight API requests
-  const pausedResolverRef = useRef(null); // resolver fn to resume from pause
-  const lastAgentPromptRef = useRef(null); // stores last agent prompt for retry
+  const abortControllerRef = useRef(null);
+  const pausedResolverRef = useRef(null);
+  const lastAgentPromptRef = useRef(null);
+  const questionResolverRef = useRef(null);
+  const approvalResolverRef = useRef(null);
 
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
@@ -169,9 +187,16 @@ const GeminiChat = forwardRef(function GeminiChat({
       if (name === 'send_keys') {
         return { type: 'send_keys', keys: args.keys, reasoning: args.reasoning, parts };
       }
+
+      if (name === 'ask_user') {
+        return { type: 'ask_user', question: args.question, reasoning: args.reasoning, parts };
+      }
+
+      if (name === 'read_terminal') {
+        return { type: 'read_terminal', reasoning: args.reasoning, parts };
+      }
     }
 
-    // Plain text response (no tool call)
     if (textPart) {
       return { type: 'text', text: textPart.text, parts };
     }
@@ -180,7 +205,6 @@ const GeminiChat = forwardRef(function GeminiChat({
   }, [model]);
 
   const executeAgentCommand = useCallback(async (command, reasoning, currentHistory) => {
-    // Add the step to UI
     setAgentSteps((prev) => [...prev, {
       type: 'command',
       command,
@@ -188,7 +212,6 @@ const GeminiChat = forwardRef(function GeminiChat({
       status: 'running',
     }]);
 
-    // Execute the command via the terminal
     let output = '';
     if (onRunAgentCommand) {
       output = await onRunAgentCommand(command);
@@ -196,18 +219,16 @@ const GeminiChat = forwardRef(function GeminiChat({
       output = '(No terminal connected for agent execution)';
     }
 
-    // Detect timeout — command may be waiting for input
     const timedOut = output.includes('timed out') || output.includes('waiting for input');
+    const displayOutput = smartTruncate(output);
 
-    // Update step with output
     setAgentSteps((prev) => prev.map((s, i) =>
       i === prev.length - 1
-        ? { ...s, output, status: timedOut ? 'timeout' : 'done' }
+        ? { ...s, output: displayOutput, status: timedOut ? 'timeout' : 'done' }
         : s
     ));
 
     if (timedOut) {
-      // Notify user and stop the agent loop
       setMessages((prev) => [...prev, {
         type: 'system',
         text: 'Command may be waiting for input. Check the terminal and resolve it, then try again.',
@@ -215,21 +236,20 @@ const GeminiChat = forwardRef(function GeminiChat({
       abortAgentRef.current = true;
     }
 
-    // Build new history with function call and response
+    const truncatedOutput = smartTruncate(output);
     const modelEntry = {
       role: 'model',
       parts: [{ functionCall: { name: 'run_command', args: { command, reasoning } } }],
     };
     const functionResponseEntry = {
       role: 'user',
-      parts: [{ functionResponse: { name: 'run_command', response: { output } } }],
+      parts: [{ functionResponse: { name: 'run_command', response: { output: truncatedOutput } } }],
     };
 
     return [...currentHistory, modelEntry, functionResponseEntry];
   }, [onRunAgentCommand]);
 
   const executeAgentSendKeys = useCallback(async (keys, reasoning, currentHistory) => {
-    // Add the step to UI
     setAgentSteps((prev) => [...prev, {
       type: 'send_keys',
       keys,
@@ -237,7 +257,6 @@ const GeminiChat = forwardRef(function GeminiChat({
       status: 'running',
     }]);
 
-    // Send the keys via the terminal
     let output = '';
     if (onSendAgentKeys) {
       output = await onSendAgentKeys(keys);
@@ -245,25 +264,60 @@ const GeminiChat = forwardRef(function GeminiChat({
       output = '(No terminal connected for sending keys)';
     }
 
-    // Update step with output
+    const displayOutput = smartTruncate(output);
+
     setAgentSteps((prev) => prev.map((s, i) =>
       i === prev.length - 1
-        ? { ...s, output, status: 'done' }
+        ? { ...s, output: displayOutput, status: 'done' }
         : s
     ));
 
-    // Build new history with function call and response
+    const truncatedOutput = smartTruncate(output);
     const modelEntry = {
       role: 'model',
       parts: [{ functionCall: { name: 'send_keys', args: { keys, reasoning } } }],
     };
     const functionResponseEntry = {
       role: 'user',
-      parts: [{ functionResponse: { name: 'send_keys', response: { output } } }],
+      parts: [{ functionResponse: { name: 'send_keys', response: { output: truncatedOutput } } }],
     };
 
     return [...currentHistory, modelEntry, functionResponseEntry];
   }, [onSendAgentKeys]);
+
+  const requestApproval = useCallback((type, detail, reasoning) => {
+    return new Promise((resolve) => {
+      setPendingApproval({ type, detail, reasoning });
+      approvalResolverRef.current = resolve;
+    });
+  }, []);
+
+  const handleApprove = useCallback(() => {
+    setPendingApproval(null);
+    if (approvalResolverRef.current) {
+      approvalResolverRef.current(true);
+      approvalResolverRef.current = null;
+    }
+  }, []);
+
+  const handleSkip = useCallback(() => {
+    setPendingApproval(null);
+    if (approvalResolverRef.current) {
+      approvalResolverRef.current(false);
+      approvalResolverRef.current = null;
+    }
+  }, []);
+
+  const handleQuestionSubmit = useCallback(() => {
+    const answer = agentQuestionInput.trim();
+    if (!answer) return;
+    setAgentQuestion(null);
+    setAgentQuestionInput('');
+    if (questionResolverRef.current) {
+      questionResolverRef.current(answer);
+      questionResolverRef.current = null;
+    }
+  }, [agentQuestionInput]);
 
   const startAgentLoop = useCallback(async (userText) => {
     abortAgentRef.current = false;
@@ -273,12 +327,12 @@ const GeminiChat = forwardRef(function GeminiChat({
     setAgentRunning(true);
     setAgentSteps([]);
     setPendingCommand(null);
+    setPendingApproval(null);
+    setAgentQuestion(null);
 
-    // Create a new AbortController for this run
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
-    // Start with user message
     const userEntry = { role: 'user', parts: [{ text: userText }] };
     let history = [...agentHistory, userEntry];
     setAgentHistory(history);
@@ -292,14 +346,12 @@ const GeminiChat = forwardRef(function GeminiChat({
           break;
         }
 
-        // If paused, wait until resumed or stopped
         if (pausedResolverRef.current === 'pending') {
           setAgentPaused(true);
           await new Promise((resolve) => {
             pausedResolverRef.current = resolve;
           });
           setAgentPaused(false);
-          // Re-check abort after resume
           if (abortAgentRef.current) {
             setAgentSteps((prev) => [...prev, { type: 'aborted', status: 'done' }]);
             break;
@@ -311,7 +363,6 @@ const GeminiChat = forwardRef(function GeminiChat({
         setIsLoading(false);
 
         if (result.type === 'text') {
-          // Model responded with text, not a tool call
           const modelEntry = { role: 'model', parts: result.parts };
           history = [...history, modelEntry];
           setAgentHistory(history);
@@ -325,7 +376,6 @@ const GeminiChat = forwardRef(function GeminiChat({
           setAgentHistory(history);
           setAgentSteps((prev) => [...prev, { type: 'complete', summary: result.summary, status: 'done' }]);
 
-          // Send back function response to close the loop
           const functionResponseEntry = {
             role: 'user',
             parts: [{ functionResponse: { name: 'task_complete', response: { acknowledged: true } } }],
@@ -335,21 +385,126 @@ const GeminiChat = forwardRef(function GeminiChat({
           break;
         }
 
+        if (result.type === 'ask_user') {
+          const modelEntry = { role: 'model', parts: result.parts };
+          history = [...history, modelEntry];
+          setAgentHistory(history);
+
+          setAgentSteps((prev) => [...prev, {
+            type: 'ask_user',
+            question: result.question,
+            reasoning: result.reasoning,
+            status: 'waiting',
+          }]);
+
+          setAgentQuestion(result.question);
+          const answer = await new Promise((resolve) => {
+            questionResolverRef.current = resolve;
+          });
+
+          if (abortAgentRef.current) {
+            setAgentSteps((prev) => [...prev, { type: 'aborted', status: 'done' }]);
+            break;
+          }
+
+          setAgentSteps((prev) => prev.map((s, idx) =>
+            idx === prev.length - 1 ? { ...s, answer, status: 'done' } : s
+          ));
+
+          const functionResponseEntry = {
+            role: 'user',
+            parts: [{ functionResponse: { name: 'ask_user', response: { answer } } }],
+          };
+          history = [...history, functionResponseEntry];
+          setAgentHistory(history);
+          continue;
+        }
+
+        if (result.type === 'read_terminal') {
+          const modelEntry = { role: 'model', parts: result.parts };
+          history = [...history, modelEntry];
+          setAgentHistory(history);
+
+          let terminalContent = '(No terminal connected)';
+          if (onReadTerminal) {
+            terminalContent = onReadTerminal();
+          }
+          const truncatedContent = smartTruncate(terminalContent);
+
+          setAgentSteps((prev) => [...prev, {
+            type: 'read_terminal',
+            reasoning: result.reasoning,
+            output: smartTruncate(terminalContent),
+            status: 'done',
+          }]);
+
+          const functionResponseEntry = {
+            role: 'user',
+            parts: [{ functionResponse: { name: 'read_terminal', response: { content: truncatedContent } } }],
+          };
+          history = [...history, functionResponseEntry];
+          setAgentHistory(history);
+          continue;
+        }
+
         if (result.type === 'command') {
-          // Execute the command
+          if (stepThrough) {
+            const approved = await requestApproval('command', result.command, result.reasoning);
+            if (abortAgentRef.current) {
+              setAgentSteps((prev) => [...prev, { type: 'aborted', status: 'done' }]);
+              break;
+            }
+            if (!approved) {
+              const modelEntry = { role: 'model', parts: result.parts };
+              const functionResponseEntry = {
+                role: 'user',
+                parts: [{ functionResponse: { name: 'run_command', response: { output: '(User declined to run this command. Try a different approach or ask the user.)' } } }],
+              };
+              history = [...history, modelEntry, functionResponseEntry];
+              setAgentHistory(history);
+              setAgentSteps((prev) => [...prev, {
+                type: 'command',
+                command: result.command,
+                reasoning: result.reasoning,
+                status: 'skipped',
+              }]);
+              continue;
+            }
+          }
           history = await executeAgentCommand(result.command, result.reasoning, history);
           setAgentHistory(history);
         }
 
         if (result.type === 'send_keys') {
-          // Send keystrokes to the terminal
+          if (stepThrough) {
+            const approved = await requestApproval('send_keys', result.keys, result.reasoning);
+            if (abortAgentRef.current) {
+              setAgentSteps((prev) => [...prev, { type: 'aborted', status: 'done' }]);
+              break;
+            }
+            if (!approved) {
+              const modelEntry = { role: 'model', parts: result.parts };
+              const functionResponseEntry = {
+                role: 'user',
+                parts: [{ functionResponse: { name: 'send_keys', response: { output: '(User declined to send these keys. Try a different approach or ask the user.)' } } }],
+              };
+              history = [...history, modelEntry, functionResponseEntry];
+              setAgentHistory(history);
+              setAgentSteps((prev) => [...prev, {
+                type: 'send_keys',
+                keys: result.keys,
+                reasoning: result.reasoning,
+                status: 'skipped',
+              }]);
+              continue;
+            }
+          }
           history = await executeAgentSendKeys(result.keys, result.reasoning, history);
           setAgentHistory(history);
         }
       }
     } catch (err) {
       setIsLoading(false);
-      // Don't show abort errors as real errors
       if (err?.name === 'AbortError') {
         setAgentSteps((prev) => [...prev, { type: 'aborted', status: 'done' }]);
       } else {
@@ -363,29 +518,40 @@ const GeminiChat = forwardRef(function GeminiChat({
       setAgentRunning(false);
       setAgentPaused(false);
       setAgentStopping(false);
+      setPendingApproval(null);
+      setAgentQuestion(null);
       pausedResolverRef.current = null;
       abortControllerRef.current = null;
+      questionResolverRef.current = null;
+      approvalResolverRef.current = null;
       setIsLoading(false);
       requestAnimationFrame(() => inputRef.current?.focus());
     }
-  }, [agentHistory, runAgentStep, executeAgentCommand, executeAgentSendKeys]);
+  }, [agentHistory, runAgentStep, executeAgentCommand, executeAgentSendKeys, onReadTerminal, stepThrough, requestApproval]);
 
   const stopAgent = useCallback(() => {
     abortAgentRef.current = true;
     setAgentStopping(true);
-    // Abort any in-flight API request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
-    // Immediately resolve any pending terminal capture
     onAbortAgentCapture?.();
-    // If paused, resolve the pause promise so the loop can exit
     if (typeof pausedResolverRef.current === 'function') {
       pausedResolverRef.current();
       pausedResolverRef.current = null;
     }
+    if (typeof questionResolverRef.current === 'function') {
+      questionResolverRef.current('(stopped)');
+      questionResolverRef.current = null;
+    }
+    if (typeof approvalResolverRef.current === 'function') {
+      approvalResolverRef.current(false);
+      approvalResolverRef.current = null;
+    }
     setAgentPaused(false);
+    setAgentQuestion(null);
+    setPendingApproval(null);
   }, [onAbortAgentCapture]);
 
   const pauseAgent = useCallback(() => {
@@ -684,16 +850,14 @@ const GeminiChat = forwardRef(function GeminiChat({
             {step.type === 'command' && (
               <>
                 <div className="agent-step-header">
-                  [{step.status === 'running' ? 'running' : step.status === 'timeout' ? 'timeout' : 'done'}] {step.reasoning}
+                  [{step.status === 'running' ? 'running' : step.status === 'timeout' ? 'timeout' : step.status === 'skipped' ? 'skipped' : 'done'}] {step.reasoning}
                 </div>
                 <div className="agent-step-command">
                   {'> '}{step.command}
                 </div>
                 {step.output && (
                   <pre className="agent-step-output">
-                    {step.output.length > 2000
-                      ? step.output.substring(0, 2000) + '\n(truncated)'
-                      : step.output}
+                    {step.output}
                   </pre>
                 )}
                 {step.status === 'timeout' && (
@@ -701,21 +865,56 @@ const GeminiChat = forwardRef(function GeminiChat({
                     command may need input — check the terminal
                   </div>
                 )}
+                {step.status === 'skipped' && (
+                  <div className="agent-step-skipped-msg">
+                    skipped by user
+                  </div>
+                )}
               </>
             )}
             {step.type === 'send_keys' && (
               <>
                 <div className="agent-step-header">
-                  [{step.status === 'running' ? 'sending' : 'sent'}] {step.reasoning}
+                  [{step.status === 'running' ? 'sending' : step.status === 'skipped' ? 'skipped' : 'sent'}] {step.reasoning}
                 </div>
                 <div className="agent-step-command agent-step-keys">
                   {'⌨ '}{step.keys}
                 </div>
                 {step.output && (
                   <pre className="agent-step-output">
-                    {step.output.length > 2000
-                      ? step.output.substring(0, 2000) + '\n(truncated)'
-                      : step.output}
+                    {step.output}
+                  </pre>
+                )}
+                {step.status === 'skipped' && (
+                  <div className="agent-step-skipped-msg">
+                    skipped by user
+                  </div>
+                )}
+              </>
+            )}
+            {step.type === 'ask_user' && (
+              <>
+                <div className="agent-step-header agent-step-header--question">
+                  [{step.status === 'waiting' ? 'waiting for answer' : 'answered'}] {step.reasoning}
+                </div>
+                <div className="agent-step-question">
+                  {'? '}{step.question}
+                </div>
+                {step.answer && (
+                  <div className="agent-step-answer">
+                    {'→ '}{step.answer}
+                  </div>
+                )}
+              </>
+            )}
+            {step.type === 'read_terminal' && (
+              <>
+                <div className="agent-step-header">
+                  [read] {step.reasoning}
+                </div>
+                {step.output && (
+                  <pre className="agent-step-output">
+                    {step.output}
                   </pre>
                 )}
               </>
@@ -737,6 +936,39 @@ const GeminiChat = forwardRef(function GeminiChat({
             )}
           </div>
         ))}
+
+        {/* Pending approval (step-through mode) */}
+        {pendingApproval && (
+          <div className="gemini-term-line agent-approval-indicator">
+            <div className="agent-approval-header">
+              {pendingApproval.type === 'command' ? '>' : '⌨'} {pendingApproval.detail}
+            </div>
+            <div className="agent-approval-reason">{pendingApproval.reasoning}</div>
+            <div className="agent-approval-buttons">
+              <button className="agent-approve-btn" onClick={handleApprove}>✓ Approve</button>
+              <button className="agent-skip-btn" onClick={handleSkip}>✗ Skip</button>
+            </div>
+          </div>
+        )}
+
+        {/* Agent question (ask_user) */}
+        {agentQuestion && (
+          <div className="gemini-term-line agent-question-indicator">
+            <div className="agent-question-text">? {agentQuestion}</div>
+            <div className="agent-question-form">
+              <input
+                className="agent-question-input"
+                type="text"
+                value={agentQuestionInput}
+                onChange={(e) => setAgentQuestionInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleQuestionSubmit(); }}
+                placeholder="Type your answer…"
+                autoFocus
+              />
+              <button className="agent-question-submit" onClick={handleQuestionSubmit}>Send</button>
+            </div>
+          </div>
+        )}
 
         {/* Paused indicator */}
         {agentPaused && (
