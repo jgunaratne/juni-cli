@@ -45,3 +45,6 @@ Thumbs.db
 *.pem
 *.key
 *.cert
+
+# Electron build output
+apps/proton/release/

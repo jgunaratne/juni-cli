@@ -49,10 +49,22 @@ Create `apps/proton/.env` with your credentials:
 ```env
 GCP_PROJECT_ID=your-gcp-project-id
 GCP_LOCATION=us-central1
-GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
 ANTHROPIC_API_KEY=sk-ant-...
 GEMINI_API_KEY=AIza...
+
+# (Optional) only needed if NOT using ADC:
+# GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
 ```
+
+### Authentication (Vertex AI)
+
+The Vertex AI SDK uses **Application Default Credentials (ADC)** — no `.json` key file is required.
+
+| Environment | How it works |
+|---|---|
+| **Local dev** | Run `gcloud auth application-default login` once. Credentials are cached at `~/.config/gcloud/application_default_credentials.json`. |
+| **On GCP** (Cloud Run, GCE, GKE) | Uses the attached service account via the metadata server automatically — zero files needed. |
+| **Explicit key file** | Set `GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json` in `.env` to override ADC. |
 
 ## Directory Structure
 

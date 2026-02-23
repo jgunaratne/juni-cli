@@ -28,13 +28,35 @@ function getIsDev() {
 }
 
 const dotenv = require('dotenv');
+// Load local .env first (project defaults), then ~/.juni-cli.env (user overrides).
+// dotenv won't overwrite vars already set, so ~/.juni-cli.env takes precedence
+// if loaded first. We load it second so the local .env acts as a fallback.
+dotenv.config({ path: path.join(os.homedir(), '.juni-cli.env') });
 dotenv.config({ path: path.join(__dirname, '.env') });
 
 /* ── Config ───────────────────────────────────────────────── */
 
 const DEFAULT_PROJECT = process.env.GCP_PROJECT_ID || '';
 const DEFAULT_LOCATION = process.env.GCP_LOCATION || 'us-central1';
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+
+/* ── Auth method detection ────────────────────────────────── */
+
+const fs = require('fs');
+
+const GCLOUD_ADC_PATH = path.join(os.homedir(), '.config', 'gcloud', 'application_default_credentials.json');
+
+if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+  console.log(`[auth] Using service account key: ${process.env.GOOGLE_APPLICATION_CREDENTIALS}`);
+} else if (fs.existsSync(GCLOUD_ADC_PATH)) {
+  // Electron may not find the well-known ADC path automatically.
+  // Explicitly set GOOGLE_APPLICATION_CREDENTIALS so the Vertex AI SDK picks it up.
+  process.env.GOOGLE_APPLICATION_CREDENTIALS = GCLOUD_ADC_PATH;
+  console.log(`[auth] Using gcloud ADC credentials: ${GCLOUD_ADC_PATH}`);
+} else {
+  console.log('[auth] No credentials found. Run `gcloud auth application-default login` for local dev.');
+}
+
+const AUTH_METHOD = process.env.GOOGLE_APPLICATION_CREDENTIALS ? 'ADC' : 'none';
 
 /* ── Embedded Express Server ──────────────────────────────── */
 
@@ -64,6 +86,7 @@ function startServer() {
         timestamp: new Date().toISOString(),
         project: DEFAULT_PROJECT || '(not set)',
         location: DEFAULT_LOCATION,
+        auth: AUTH_METHOD,
         mode: 'proton',
       });
     });
@@ -73,7 +96,6 @@ function startServer() {
     expressApp.use('/api/gemini', createGeminiRoutes({
       defaultProject: DEFAULT_PROJECT,
       defaultLocation: DEFAULT_LOCATION,
-      getApiKey: () => GEMINI_API_KEY,
     }));
 
     expressApp.use('/api/claude', createClaudeRoutes({

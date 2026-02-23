@@ -38,8 +38,8 @@ body,
 }
 
 body {
-  font-family: 'Ubuntu Mono', monospace;
-    font-size: 15px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 13px;
     background: var(--terminal-bg, var(--bg-primary));
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;

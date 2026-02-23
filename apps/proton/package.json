@@ -11,8 +11,8 @@
     "pack": "npm run build:renderer && electron-builder --mac --dir"
   },
   "build": {
-    "appId": "com.junius.juni-cli-proton",
-    "productName": "juni-cli-proton",
+    "appId": "com.gunaratne.juni-cli-proton",
+    "productName": "Juni CLI",
     "mac": {
       "category": "public.app-category.developer-tools",
       "target": ["dmg", "zip"],

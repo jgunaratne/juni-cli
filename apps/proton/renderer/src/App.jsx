@@ -8,6 +8,7 @@ const SPLIT_GEMINI_ID = '__split_gemini__';
 
 const GEMINI_MODELS = [
   { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash' },
+  { id: 'gemini-3-pro-preview', label: 'Gemini 3 Pro' },
   { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
 ];
 
@@ -67,8 +68,6 @@ function App() {
   const [fontSize, setFontSize] = useState(saved.fontSize || 15);
   const [bgColor, setBgColor] = useState(saved.bgColor || '#0d1117');
   const [claudeEnabled, setClaudeEnabled] = useState(saved.claudeEnabled ?? false);
-  const [geminiApiKey, setGeminiApiKey] = useState(saved.geminiApiKey || '');
-  const [showApiKey, setShowApiKey] = useState(false);
 
   const terminalRefs = useRef({});
   const splitGeminiRef = useRef(null);
@@ -96,8 +95,8 @@ function App() {
   }, [fontFamily]);
 
   useEffect(() => {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ fontFamily, fontSize, bgColor, claudeEnabled, splitMode, geminiApiKey }));
-  }, [fontFamily, fontSize, bgColor, claudeEnabled, splitMode, geminiApiKey]);
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ fontFamily, fontSize, bgColor, claudeEnabled, splitMode }));
+  }, [fontFamily, fontSize, bgColor, claudeEnabled, splitMode]);
 
   useEffect(() => {
     document.documentElement.style.setProperty('--terminal-font', `'${fontFamily}', monospace`);
@@ -340,7 +339,7 @@ function App() {
         <div className="titlebar-drag-region" />
         <div className="logo">
           <span className="logo-icon">⬡</span>
-          <h1>juni-cli<span className="proton-badge">proton</span></h1>
+          <h1>Juni CLI</h1>
         </div>
         <div className="header-right">
           {hasReadySSH && (
@@ -413,13 +412,13 @@ function App() {
             </>
           )}
           <div className="settings-wrapper" ref={settingsRef}>
-            <button
+            <span
               className={`settings-gear ${showSettings ? 'settings-gear--active' : ''}`}
               onClick={() => setShowSettings((prev) => !prev)}
               title="Settings"
             >
               ⚙
-            </button>
+            </span>
             {showSettings && (
               <div className="settings-panel">
                 <div className="settings-title">Settings</div>
@@ -482,32 +481,6 @@ function App() {
                   <span className="settings-toggle-label">Enable Claude</span>
                 </label>
 
-                <div className="settings-group">
-                  <label className="settings-label">Gemini API Key (GenAI)</label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <input
-                      className="settings-input"
-                      type={showApiKey ? 'text' : 'password'}
-                      value={geminiApiKey}
-                      onChange={(e) => setGeminiApiKey(e.target.value)}
-                      placeholder="Enter your Gemini API key…"
-                      spellCheck="false"
-                      autoComplete="off"
-                      style={{ flex: 1, fontFamily: 'monospace' }}
-                    />
-                    <button
-                      className="settings-reset-btn"
-                      onClick={() => setShowApiKey((prev) => !prev)}
-                      title={showApiKey ? 'Hide API key' : 'Show API key'}
-                      style={{ minWidth: '52px' }}
-                    >
-                      {showApiKey ? 'Hide' : 'Show'}
-                    </button>
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px', lineHeight: 1.4 }}>
-                    Required for Gemini 3 Flash (Google AI).
-                  </div>
-                </div>
 
                 <div className="settings-preview" style={{ fontFamily: `'${fontFamily}', monospace`, fontSize: `${fontSize}px` }}>
                   The quick brown fox jumps over the lazy dog
@@ -541,7 +514,7 @@ function App() {
               <span className="tab-label">
                 {getTabLabel(tab)}
               </span>
-              <button
+              <span
                 className="tab-close"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -550,7 +523,7 @@ function App() {
                 title="Close session"
               >
                 ✕
-              </button>
+              </span>
             </div>
           ))}
 
@@ -625,8 +598,7 @@ function App() {
                     return termRef ? termRef.getBufferText() : '(Terminal ref not found)';
                   }}
                   stepThrough={stepThrough}
-                  serverUrl={serverUrl}
-                  apiKey={geminiApiKey}
+                    serverUrl={serverUrl}
                 />
               )
             ) : tab.type === 'claude' ? (
@@ -669,7 +641,6 @@ function App() {
                 }}
                 stepThrough={stepThrough}
                 serverUrl={serverUrl}
-                apiKey={geminiApiKey}
               />
             </div>
           </>

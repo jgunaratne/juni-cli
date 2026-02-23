@@ -1,49 +1,50 @@
 const { VertexAI } = require('@google-cloud/vertexai');
+const { GoogleGenAI } = require('@google/genai');
 
-const clientCache = new Map();
+/* ── Vertex AI client (for non-Gemini-3 models) ──────────── */
+
+const vertexCache = new Map();
 
 function getVertexClient(project, location) {
   const key = `${project}::${location}`;
-  if (!clientCache.has(key)) {
-    clientCache.set(key, new VertexAI({ project, location }));
+  if (!vertexCache.has(key)) {
+    vertexCache.set(key, new VertexAI({ project, location }));
   }
-  return clientCache.get(key);
+  return vertexCache.get(key);
 }
 
-async function callGenAI(model, apiKey, requestBody) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(requestBody),
-  });
+/* ── @google/genai client (for Gemini 3 models via Vertex AI) */
 
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error?.message || `Google AI API error: HTTP ${res.status}`);
-  }
+const genaiCache = new Map();
 
-  return res.json();
+/**
+ * Preview models require the 'global' region.
+ */
+function requiresGlobalRegion(model) {
+  return model.includes('preview');
 }
 
-function convertSchemaToGenAI(schema) {
-  if (!schema) return schema;
-  const result = { ...schema };
-  if (result.type) {
-    result.type = result.type.toLowerCase();
+/**
+ * Creates a GoogleGenAI client configured for Vertex AI.
+ * Auto-selects 'global' region for preview models.
+ */
+function getGeminiClient(project, location) {
+  const resolvedLocation = requiresGlobalRegion('preview')
+    ? 'global'
+    : (location || 'us-central1');
+
+  const key = `genai::${project}::${resolvedLocation}`;
+  if (!genaiCache.has(key)) {
+    genaiCache.set(key, new GoogleGenAI({
+      vertexai: true,
+      project,
+      location: resolvedLocation,
+    }));
   }
-  if (result.properties) {
-    result.properties = Object.fromEntries(
-      Object.entries(result.properties).map(([key, val]) => [key, convertSchemaToGenAI(val)])
-    );
-  }
-  if (result.items) {
-    result.items = convertSchemaToGenAI(result.items);
-  }
-  return result;
+  return genaiCache.get(key);
 }
 
-// Models that should use the Generative Language API instead of Vertex AI
-const GENAI_MODELS = ['gemini-3-flash-preview'];
+// Models that use @google/genai via Vertex AI instead of @google-cloud/vertexai
+const GENAI_MODELS = ['gemini-3-flash-preview', 'gemini-3-pro-preview'];
 
-module.exports = { getVertexClient, callGenAI, convertSchemaToGenAI, GENAI_MODELS };
+module.exports = { getVertexClient, getGeminiClient, GENAI_MODELS };

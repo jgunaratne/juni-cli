@@ -22,11 +22,11 @@ function loadCmdHistory() {
 
 /* ── API helpers ─────────────────────────────────────── */
 
-async function callGemini(serverUrl, model, messages, apiKey) {
+async function callGemini(serverUrl, model, messages) {
   const res = await fetch(`${serverUrl}/api/gemini/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, messages, apiKey }),
+    body: JSON.stringify({ model, messages }),
   });
 
   if (!res.ok) {
@@ -38,11 +38,11 @@ async function callGemini(serverUrl, model, messages, apiKey) {
   return data.reply ?? 'No response generated.';
 }
 
-async function callGeminiAgent(serverUrl, model, history, apiKey, signal) {
+async function callGeminiAgent(serverUrl, model, history, signal) {
   const res = await fetch(`${serverUrl}/api/gemini/agent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, history, apiKey }),
+    body: JSON.stringify({ model, history }),
     signal,
   });
 
@@ -83,7 +83,6 @@ const GeminiChat = forwardRef(function GeminiChat({
   onReadTerminal,
   stepThrough = false,
   serverUrl,
-  apiKey,
 }, ref) {
   const pastedTextRef = useRef(null);
   const autoSendRef = useRef(false);
@@ -150,7 +149,7 @@ const GeminiChat = forwardRef(function GeminiChat({
   /* ── Agent loop ──────────────────────────────────────── */
 
   const runAgentStep = useCallback(async (history, signal) => {
-    const parts = await callGeminiAgent(serverUrl, model, history, apiKey, signal);
+    const parts = await callGeminiAgent(serverUrl, model, history, signal);
 
     const functionCall = parts.find((p) => p.functionCall);
     const textPart = parts.find((p) => p.text);
@@ -184,7 +183,7 @@ const GeminiChat = forwardRef(function GeminiChat({
     }
 
     return { type: 'text', text: 'No response generated.', parts: [{ text: 'No response generated.' }] };
-  }, [serverUrl, model, apiKey]);
+  }, [serverUrl, model]);
 
   const executeAgentCommand = useCallback(async (command, reasoning, currentHistory, originalParts) => {
     setAgentSteps((prev) => [...prev, {
@@ -623,7 +622,7 @@ const GeminiChat = forwardRef(function GeminiChat({
         .filter((m) => m.type === 'user' || m.type === 'model')
         .map((m) => ({ role: m.type === 'user' ? 'user' : 'model', text: m.text }));
 
-      const reply = await callGemini(serverUrl, model, apiMessages, apiKey);
+      const reply = await callGemini(serverUrl, model, apiMessages);
       setMessages((prev) => [...prev, { type: 'model', text: renderForTerminal(reply) }]);
     } catch (err) {
       setMessages((prev) => [
