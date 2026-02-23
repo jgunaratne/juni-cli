@@ -1,10 +1,9 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import ConnectionForm from './components/ConnectionForm';
-import Terminal from './components/Terminal';
-import GeminiChat from './components/GeminiChat';
-import ClaudeChat from './components/ClaudeChat';
+import { ConnectionForm, Terminal, GeminiChat, ClaudeChat } from '@juni/shared-ui';
 
 import './App.css';
+
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || window.location.origin;
 
 let nextId = 1;
 const SPLIT_GEMINI_ID = '__split_gemini__';
@@ -473,7 +472,7 @@ function App() {
               ) : tab.type === 'claude' ? (
                 <span className="tab-gemini-icon" style={{ color: '#d4a574' }}>◈</span>
               ) : (
-                  <span className={`tab-status-dot ${tab.status}`} />
+                <span className={`tab-status-dot ${tab.status}`} />
               )}
               <span className="tab-label">
                 {getTabLabel(tab)}
@@ -540,6 +539,7 @@ function App() {
                 fontFamily={fontFamily}
                 fontSize={fontSize}
                 bgColor={bgColor}
+                serverUrl={SERVER_URL}
 
               />
             ) : tab.type === 'gemini' ? (
@@ -551,17 +551,18 @@ function App() {
                   onStatusChange={(status) => handleStatusChange(tab.id, status)}
                   onClose={() => handleCloseTab(tab.id)}
                   onRunCommand={handleRunCommand}
-                    agentMode={agentMode}
-                    onRunAgentCommand={handleRunAgentCommand}
-                    onSendAgentKeys={handleSendAgentKeys}
-                    onAbortAgentCapture={handleAbortAgentCapture}
-                    onReadTerminal={() => {
-                      const sshTabId = activeTab && tabs.find((t) => t.id === activeTab && t.type === 'ssh') ? activeTab : tabs.find((t) => t.type === 'ssh')?.id;
-                      if (!sshTabId) return '(No terminal connected)';
-                      const termRef = terminalRefs.current[sshTabId];
-                      return termRef ? termRef.getBufferText() : '(Terminal ref not found)';
-                    }}
-                    stepThrough={stepThrough}
+                  agentMode={agentMode}
+                  onRunAgentCommand={handleRunAgentCommand}
+                  onSendAgentKeys={handleSendAgentKeys}
+                  onAbortAgentCapture={handleAbortAgentCapture}
+                  serverUrl={SERVER_URL}
+                  onReadTerminal={() => {
+                    const sshTabId = activeTab && tabs.find((t) => t.id === activeTab && t.type === 'ssh') ? activeTab : tabs.find((t) => t.type === 'ssh')?.id;
+                    if (!sshTabId) return '(No terminal connected)';
+                    const termRef = terminalRefs.current[sshTabId];
+                    return termRef ? termRef.getBufferText() : '(Terminal ref not found)';
+                  }}
+                  stepThrough={stepThrough}
                 />
               )
             ) : tab.type === 'claude' ? (
@@ -572,7 +573,7 @@ function App() {
                   onStatusChange={(status) => handleStatusChange(tab.id, status)}
                   onClose={() => handleCloseTab(tab.id)}
                   onRunCommand={handleRunCommand}
-
+                  serverUrl={SERVER_URL}
                 />
               )
             ) : null,
@@ -596,6 +597,7 @@ function App() {
                 onRunAgentCommand={handleRunAgentCommand}
                 onSendAgentKeys={handleSendAgentKeys}
                 onAbortAgentCapture={handleAbortAgentCapture}
+                serverUrl={SERVER_URL}
                 onReadTerminal={() => {
                   const sshTabId = activeTab && tabs.find((t) => t.id === activeTab && t.type === 'ssh') ? activeTab : tabs.find((t) => t.type === 'ssh')?.id;
                   if (!sshTabId) return '(No terminal connected)';

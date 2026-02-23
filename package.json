@@ -1,12 +1,16 @@
 {
-  "name": "juni-cli",
+  "name": "juni-cli-monorepo",
   "version": "1.0.0",
   "private": true,
-  "description": "Web-based SSH client with React frontend and Express backend",
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "apps/*/client",
+    "apps/*/server",
+    "apps/*/renderer"
+  ],
   "scripts": {
-    "dev:server": "cd server && npm run dev",
-    "dev:client": "cd client && npm run dev",
-    "dev": "npx -y concurrently \"npm run dev:server\" \"npm run dev:client\"",
-    "install:all": "cd server && npm install && cd ../client && npm install"
+    "dev:web": "cd apps/web && npm run dev",
+    "dev:proton": "cd apps/proton && npm run dev"
   }
 }
