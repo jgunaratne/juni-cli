@@ -433,6 +433,7 @@
   flex-shrink: 0;
   overflow-x: auto;
   scrollbar-width: none;
+  font-family: 'Inter', sans-serif;
 }
 
 .tab-bar::-webkit-scrollbar {
