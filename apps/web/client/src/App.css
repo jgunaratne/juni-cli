@@ -343,68 +343,42 @@
   border: 2px solid var(--bg-secondary);
 }
 
-.settings-toggle {
+.settings-radio-group {
+  display: flex;
+  gap: 6px;
+}
+
+.settings-radio {
   display: flex;
   align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  margin-bottom: 14px;
-}
-
-.settings-toggle input[type="checkbox"] {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 28px;
-  height: 14px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 7px;
-  position: relative;
-  cursor: pointer;
-  margin: 0;
-  flex-shrink: 0;
-  transition: background 0.2s;
-}
-
-.settings-toggle input[type="checkbox"]::after {
-  content: '';
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #484f58;
-  transition: all 0.2s;
-}
-
-.settings-toggle input[type="checkbox"]:checked {
-  background: rgba(212, 165, 116, 0.3);
-}
-
-.settings-toggle input[type="checkbox"]:checked::after {
-  left: 16px;
-  background: #d4a574;
-}
-
-.settings-toggle-label {
+  justify-content: center;
+  gap: 4px;
+  flex: 1;
   font-family: 'Ubuntu Mono', monospace;
   font-size: 12px;
   font-weight: 500;
   color: var(--text-muted);
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  transition: all 0.15s;
   user-select: none;
 }
 
-.settings-toggle:has(input:checked) .settings-toggle-label {
+.settings-radio input[type="radio"] {
+  display: none;
+}
+
+.settings-radio:hover {
+  border-color: var(--accent);
   color: var(--text-secondary);
 }
-.settings-preview {
-  padding: 10px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text-secondary);
-  line-height: 1.4;
-  word-break: break-word;
+
+.settings-radio--active {
+  border-color: var(--accent);
+  background: rgba(251, 188, 4, 0.1);
+  color: var(--accent);
 }
 .status-bar {
   display: flex;
@@ -693,6 +667,10 @@
   flex-direction: row;
 }
 
+.app-main--split-vertical {
+  flex-direction: column;
+}
+
 /* ─── Split panels ────────────────────────────────────────── */
 
 .split-panel {
@@ -708,13 +686,27 @@
 
 .app-main--split .split-panel--left {
   flex: none;
-    width: var(--split-left-width, 50%);
+    width: var(--split-ratio, 50%);
     min-width: 200px;
 }
 
 .app-main--split .split-panel--right {
   flex: 1;
   min-width: 200px;
+}
+
+/* Vertical layout overrides */
+.app-main--split-vertical .split-panel--left {
+  width: 100%;
+  height: var(--split-ratio, 50%);
+  min-width: 0;
+  min-height: 100px;
+}
+
+.app-main--split-vertical .split-panel--right {
+  width: 100%;
+  min-width: 0;
+  min-height: 100px;
 }
 
 .split-divider {
@@ -725,7 +717,12 @@
   cursor: col-resize;
     transition: background 0.15s;
   }
-  
+.app-main--split-vertical .split-divider {
+  width: 100%;
+  height: 5px;
+  cursor: row-resize;
+}
+
   .split-divider:hover,
   .split-divider.dragging {
     background: var(--accent);

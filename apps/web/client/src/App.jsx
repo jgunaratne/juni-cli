@@ -10,6 +10,7 @@ const SPLIT_GEMINI_ID = '__split_gemini__';
 
 const GEMINI_MODELS = [
   { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash' },
+  { id: 'gemini-3-pro-preview', label: 'Gemini 3 Pro' },
   { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
 ];
 
@@ -22,6 +23,8 @@ const MONO_FONTS = [
   { id: 'IBM Plex Mono', label: 'IBM Plex Mono', google: true },
   { id: 'Space Mono', label: 'Space Mono', google: true },
   { id: 'Roboto Mono', label: 'Roboto Mono', google: true },
+  { id: 'SF Mono', label: 'SF Mono (macOS)', google: false },
+  { id: 'Menlo', label: 'Menlo (macOS)', google: false },
 ];
 
 const SETTINGS_KEY = 'juni-cli:settings';
@@ -52,6 +55,10 @@ function App() {
     const s = loadSettings();
     return s.splitMode ?? false;
   });
+  const [splitLayout, setSplitLayout] = useState(() => {
+    const s = loadSettings();
+    return s.splitLayout ?? 'horizontal';
+  });
   const [splitGeminiStatus, setSplitGeminiStatus] = useState('connecting');
   const [splitFocus, setSplitFocus] = useState('left');
   const [splitRatio, setSplitRatio] = useState(50);
@@ -66,7 +73,7 @@ function App() {
   const [fontSize, setFontSize] = useState(saved.fontSize || 15);
   const [bgColor, setBgColor] = useState(saved.bgColor || '#0d1117');
 
-  const [claudeEnabled, setClaudeEnabled] = useState(saved.claudeEnabled ?? false);
+
 
   const terminalRefs = useRef({});
   const splitGeminiRef = useRef(null);
@@ -81,8 +88,8 @@ function App() {
   }, [fontFamily]);
 
   useEffect(() => {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ fontFamily, fontSize, bgColor, claudeEnabled, splitMode }));
-  }, [fontFamily, fontSize, bgColor, claudeEnabled, splitMode]);
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ fontFamily, fontSize, bgColor, splitMode, splitLayout }));
+  }, [fontFamily, fontSize, bgColor, splitMode, splitLayout]);
 
   useEffect(() => {
     document.documentElement.style.setProperty('--terminal-font', `'${fontFamily}', monospace`);
@@ -93,16 +100,22 @@ function App() {
   const handleDividerMouseDown = useCallback((e) => {
     e.preventDefault();
     isDragging.current = true;
-    document.body.style.cursor = 'col-resize';
+    document.body.style.cursor = splitLayout === 'vertical' ? 'row-resize' : 'col-resize';
     document.body.style.userSelect = 'none';
-  }, []);
+  }, [splitLayout]);
 
   useEffect(() => {
     const handleMouseMove = (e) => {
       if (!isDragging.current || !mainRef.current) return;
       const rect = mainRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const pct = (x / rect.width) * 100;
+      let pct;
+      if (splitLayout === 'vertical') {
+        const y = e.clientY - rect.top;
+        pct = (y / rect.height) * 100;
+      } else {
+        const x = e.clientX - rect.left;
+        pct = (x / rect.width) * 100;
+      }
       setSplitRatio(Math.min(Math.max(pct, 15), 85));
     };
     const handleMouseUp = () => {
@@ -117,7 +130,7 @@ function App() {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, []);
+  }, [splitLayout]);
 
   // Close settings when clicking outside
   useEffect(() => {
@@ -303,17 +316,17 @@ function App() {
       <header className="app-header">
         <div className="logo">
           <span className="logo-icon">⬡</span>
-          <h1>juni-cli</h1>
+          <h1>Juni CLI</h1>
         </div>
         <div className="header-right">
           {hasReadySSH && (
             <button
               className={`split-toggle ${splitMode ? 'split-toggle--active' : ''}`}
               onClick={toggleSplit}
-              title={splitMode ? 'Exit split screen' : 'Split screen: Terminal + Gemini'}
+              title={splitMode ? 'Hide Gemini panel' : 'Show Gemini panel'}
             >
               <span className="split-toggle-icon">⬡</span>
-              {splitMode ? 'Exit Split' : 'Split'}
+              {splitMode ? 'Hide Gemini' : 'Show Gemini'}
             </button>
           )}
           {splitMode && activeSession?.type === 'ssh' && (
@@ -376,13 +389,13 @@ function App() {
             </>
           )}
           <div className="settings-wrapper" ref={settingsRef}>
-            <button
+            <span
               className={`settings-gear ${showSettings ? 'settings-gear--active' : ''}`}
               onClick={() => setShowSettings((prev) => !prev)}
               title="Settings"
             >
               ⚙
-            </button>
+            </span>
             {showSettings && (
               <div className="settings-panel">
                 <div className="settings-title">Settings</div>
@@ -436,17 +449,31 @@ function App() {
                     </button>
                   </div>
                 </div>
-                <label className="settings-toggle">
-                  <input
-                    type="checkbox"
-                    checked={claudeEnabled}
-                    onChange={(e) => setClaudeEnabled(e.target.checked)}
-                  />
-                  <span className="settings-toggle-label">Enable Claude</span>
-                </label>
 
-                <div className="settings-preview" style={{ fontFamily: `'${fontFamily}', monospace`, fontSize: `${fontSize}px` }}>
-                  The quick brown fox jumps over the lazy dog
+                <div className="settings-group">
+                  <label className="settings-label">Split Layout</label>
+                  <div className="settings-radio-group">
+                    <label className={`settings-radio ${splitLayout === 'horizontal' ? 'settings-radio--active' : ''}`}>
+                      <input
+                        type="radio"
+                        name="splitLayout"
+                        value="horizontal"
+                        checked={splitLayout === 'horizontal'}
+                        onChange={() => setSplitLayout('horizontal')}
+                      />
+                      ◧ Left / Right
+                    </label>
+                    <label className={`settings-radio ${splitLayout === 'vertical' ? 'settings-radio--active' : ''}`}>
+                      <input
+                        type="radio"
+                        name="splitLayout"
+                        value="vertical"
+                        checked={splitLayout === 'vertical'}
+                        onChange={() => setSplitLayout('vertical')}
+                      />
+                      ⬒ Top / Bottom
+                    </label>
+                  </div>
                 </div>
               </div>
             )}
@@ -504,7 +531,7 @@ function App() {
                 ✦
               </button>
             )}
-            {hasReadySSH && claudeEnabled && (
+            {hasReadySSH && (
               <button
                 className="tab-new tab-new--claude"
                 onClick={handleOpenClaude}
@@ -518,7 +545,7 @@ function App() {
       )}
 
       {/* ── Content ─────────────────────────────────────── */}
-      <main className={`app-main ${splitMode ? 'app-main--split' : ''}`} ref={mainRef} style={splitMode ? { '--split-left-width': `${splitRatio}%` } : undefined}>
+      <main className={`app-main ${splitMode ? `app-main--split app-main--split-${splitLayout}` : ''}`} ref={mainRef} style={splitMode ? { '--split-ratio': `${splitRatio}%` } : undefined}>
         {/* Left panel (or full panel when not split) */}
         <div className={`split-panel split-panel--left ${splitMode ? '' : 'split-panel--full'}`}>
           {showForm && <ConnectionForm onConnect={handleConnect} />}
