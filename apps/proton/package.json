@@ -8,7 +8,9 @@
     "dev": "concurrently \"cd renderer && npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
     "build:renderer": "cd renderer && npm run build",
     "build": "npm run build:renderer && electron-builder --mac",
-    "pack": "npm run build:renderer && electron-builder --mac --dir"
+    "build:linux": "npm run build:renderer && electron-builder --linux",
+    "pack": "npm run build:renderer && electron-builder --mac --dir",
+    "pack:linux": "npm run build:renderer && electron-builder --linux --dir"
   },
   "build": {
     "appId": "com.gunaratne.juni-cli-proton",
@@ -17,6 +19,14 @@
       "category": "public.app-category.developer-tools",
       "target": ["dmg", "zip"],
       "icon": "assets/icon.icns"
+    },
+    "linux": {
+      "category": "Development",
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "assets/icon.png"
     },
     "directories": {
       "output": "release",

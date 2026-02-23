@@ -252,13 +252,17 @@ The regular (non-agent) chat endpoint. Simpler — no function calling.
 
 ## File-by-File Breakdown
 
-### `server/index.js` — Agent Endpoint
+### `packages/shared-server/src/agentTools.js` — Tool Declarations
 
 - **`AGENT_TOOLS`** — Array of function declarations (`run_command`, `send_keys`, `task_complete`) passed to Vertex AI
 - **`AGENT_SYSTEM_PROMPT`** — Instructs Gemini to act as an expert sysadmin, prefer `run_command` over `send_keys`, avoid interactive commands, use non-interactive flags, and call `task_complete` when done
-- **`/api/gemini/agent`** — POST endpoint that forwards the conversation history to Vertex AI with tools and returns the model's response parts
 
-### `client/src/components/Terminal.jsx` — Output Capture
+### `packages/shared-server/src/geminiRoutes.js` — Agent Endpoint
+
+- **`/api/gemini/agent`** — POST endpoint that forwards the conversation history to Vertex AI with tools and returns the model's response parts
+- **`/api/gemini/chat`** — POST endpoint for regular (non-agent) chat
+
+### `packages/shared-ui/src/components/Terminal.jsx` — Output Capture
 
 Methods exposed via `useImperativeHandle`:
 
@@ -270,7 +274,7 @@ Methods exposed via `useImperativeHandle`:
 | `writeToTerminal(text)` | Sends raw text to the SSH socket (used by the "Send to Terminal" feature). |
 | `getBufferText()` | Reads the full terminal buffer content (used by "Send to Gemini"). |
 
-### `client/src/components/GeminiChat.jsx` — Agent Loop Controller
+### `packages/shared-ui/src/components/GeminiChat.jsx` — Agent Loop Controller
 
 **State:**
 - `agentHistory` — Full Vertex AI conversation history (function calls + responses)
@@ -293,9 +297,9 @@ Methods exposed via `useImperativeHandle`:
 - `retryAgent()` — Re-runs last prompt with fresh history
 - `handleNewChat()` — Full context reset including localStorage
 
-### `client/src/App.jsx` — Wiring
+### `apps/*/src/App.jsx` — Wiring
 
-Callbacks that bridge GeminiChat to Terminal:
+Both the web and Proton apps wire GeminiChat to Terminal via callbacks:
 
 | Callback | Prop Name | Terminal Method |
 |----------|-----------|----------------|

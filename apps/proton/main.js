@@ -148,7 +148,8 @@ function startServer() {
           console.log('[local] spawning local shell');
           socket.emit('ssh:status', { status: 'authenticated' });
 
-          const shellPath = process.env.SHELL || '/bin/zsh';
+          const defaultShell = process.platform === 'darwin' ? '/bin/zsh' : '/bin/bash';
+          const shellPath = process.env.SHELL || defaultShell;
           const homeDir = os.homedir();
 
           ptyProcess = pty.spawn(shellPath, ['-l'], {
@@ -278,13 +279,13 @@ function startServer() {
 let mainWindow = null;
 
 function createWindow() {
-  mainWindow = new BrowserWindow({
+  const isMac = process.platform === 'darwin';
+
+  const windowOptions = {
     width: 1400,
     height: 900,
     minWidth: 800,
     minHeight: 600,
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 16, y: 18 },
     backgroundColor: '#0d1117',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -292,7 +293,14 @@ function createWindow() {
       nodeIntegration: false,
     },
     show: false,
-  });
+  };
+
+  if (isMac) {
+    windowOptions.titleBarStyle = 'hiddenInset';
+    windowOptions.trafficLightPosition = { x: 16, y: 18 };
+  }
+
+  mainWindow = new BrowserWindow(windowOptions);
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();

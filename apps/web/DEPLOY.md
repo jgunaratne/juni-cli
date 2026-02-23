@@ -41,11 +41,23 @@ nano apps/web/server/.env
 ```env
 GCP_PROJECT_ID=your-gcp-project-id
 GCP_LOCATION=us-central1
-GOOGLE_APPLICATION_CREDENTIALS=/path/to/your/service-account-key.json
 PORT=3001
 ANTHROPIC_API_KEY=sk-ant-...
 GEMINI_API_KEY=AIza...
+
+# (Optional) only needed if NOT using ADC:
+# GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
 ```
+
+### Authentication (Vertex AI)
+
+The Vertex AI SDK uses **Application Default Credentials (ADC)** — no `.json` key file is required.
+
+| Environment | How it works |
+|---|---|
+| **Local dev** | Run `gcloud auth application-default login` once. Credentials are cached at `~/.config/gcloud/application_default_credentials.json`. |
+| **On GCP** (Cloud Run, GCE, GKE) | Uses the attached service account via the metadata server automatically — zero files needed. |
+| **Explicit key file** | Set `GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json` in `.env` to override ADC. |
 
 ## 4. Build the Frontend
 
@@ -171,14 +183,14 @@ pm2 restart juni-cli                 # restart backend
 juni-cli/
 ├── package.json                     ← workspace root (npm install here)
 ├── packages/
-│   ├── shared-server/               ← @juni/shared-server (routes, tools, SSH)
-│   └── shared-ui/                   ← @juni/shared-ui (components, utils)
+│   ├── shared-server/               ← @juni/shared-server (Gemini/Claude routes, SSH, agent tools)
+│   └── shared-ui/                   ← @juni/shared-ui (React components, xterm)
 ├── apps/
 │   ├── web/
 │   │   ├── server/index.js          ← Express backend (pm2 runs this)
 │   │   ├── server/.env              ← environment config
 │   │   └── client/dist/             ← built frontend (nginx serves this)
-│   └── proton/                      ← Electron desktop app (not deployed)
+│   └── proton/                      ← Electron desktop app (not deployed here)
 ```
 
 ## Environment Variables
@@ -187,7 +199,8 @@ juni-cli/
 |---|---|---|---|
 | `GCP_PROJECT_ID` | `server/.env` | — | Required for Vertex AI |
 | `GCP_LOCATION` | `server/.env` | `us-central1` | GCP region |
-| `GOOGLE_APPLICATION_CREDENTIALS` | `server/.env` | — | Path to service account JSON |
+| `GOOGLE_APPLICATION_CREDENTIALS` | `server/.env` | — | Optional — override ADC with explicit key file |
 | `PORT` | `server/.env` | `3001` | Express listen port |
 | `ANTHROPIC_API_KEY` | `server/.env` | — | For Claude chat |
-| `GEMINI_API_KEY` | `server/.env` | — | For Gemini 3 Flash (Google AI) |
+| `GEMINI_API_KEY` | `server/.env` | — | For Gemini 3 Flash (Google AI direct) |
+| `CORS_ORIGIN` | `server/.env` | `localhost:5173` | Comma-separated allowed origins |
