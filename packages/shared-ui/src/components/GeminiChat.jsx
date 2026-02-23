@@ -186,7 +186,7 @@ const GeminiChat = forwardRef(function GeminiChat({
     return { type: 'text', text: 'No response generated.', parts: [{ text: 'No response generated.' }] };
   }, [serverUrl, model, apiKey]);
 
-  const executeAgentCommand = useCallback(async (command, reasoning, currentHistory) => {
+  const executeAgentCommand = useCallback(async (command, reasoning, currentHistory, originalParts) => {
     setAgentSteps((prev) => [...prev, {
       type: 'command',
       command,
@@ -221,7 +221,7 @@ const GeminiChat = forwardRef(function GeminiChat({
     const truncatedOutput = smartTruncate(output);
     const modelEntry = {
       role: 'model',
-      parts: [{ functionCall: { name: 'run_command', args: { command, reasoning } } }],
+      parts: originalParts,
     };
     const functionResponseEntry = {
       role: 'user',
@@ -231,7 +231,7 @@ const GeminiChat = forwardRef(function GeminiChat({
     return [...currentHistory, modelEntry, functionResponseEntry];
   }, [onRunAgentCommand]);
 
-  const executeAgentSendKeys = useCallback(async (keys, reasoning, currentHistory) => {
+  const executeAgentSendKeys = useCallback(async (keys, reasoning, currentHistory, originalParts) => {
     setAgentSteps((prev) => [...prev, {
       type: 'send_keys',
       keys,
@@ -257,7 +257,7 @@ const GeminiChat = forwardRef(function GeminiChat({
     const truncatedOutput = smartTruncate(output);
     const modelEntry = {
       role: 'model',
-      parts: [{ functionCall: { name: 'send_keys', args: { keys, reasoning } } }],
+      parts: originalParts,
     };
     const functionResponseEntry = {
       role: 'user',
@@ -453,7 +453,7 @@ const GeminiChat = forwardRef(function GeminiChat({
               continue;
             }
           }
-          history = await executeAgentCommand(result.command, result.reasoning, history);
+          history = await executeAgentCommand(result.command, result.reasoning, history, result.parts);
           setAgentHistory(history);
         }
 
@@ -481,7 +481,7 @@ const GeminiChat = forwardRef(function GeminiChat({
               continue;
             }
           }
-          history = await executeAgentSendKeys(result.keys, result.reasoning, history);
+          history = await executeAgentSendKeys(result.keys, result.reasoning, history, result.parts);
           setAgentHistory(history);
         }
       }
