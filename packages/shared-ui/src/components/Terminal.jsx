@@ -1,4 +1,4 @@
-import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { io } from 'socket.io-client';
@@ -17,13 +17,18 @@ const stripAnsi = (str) => str
   .replace(/\[[\?]?[0-9;]*[a-zA-Z]/g, '')
   .replace(/\r/g, '');
 
-const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onStatusChange, onClose, fontFamily, fontSize, bgColor, serverUrl }, ref) {
+const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onStatusChange, onClose, fontFamily, fontSize, bgColor, serverUrl, isSharing, shareCode, viewerCount, onShareStart, onShareStop, onTerminalOutput }, ref) {
+  const [showSharePanel, setShowSharePanel] = useState(false);
+  const sharePanelRef = useRef(null);
   const termRef = useRef(null);
   const xtermRef = useRef(null);
   const fitRef = useRef(null);
   const socketRef = useRef(null);
   const agentCaptureRef = useRef(null);
   const agentKeysRef = useRef(null);
+  const onTerminalOutputRef = useRef(onTerminalOutput);
+  // Keep the output callback ref current on every render
+  useEffect(() => { onTerminalOutputRef.current = onTerminalOutput; });
 
   useImperativeHandle(ref, () => ({
     focus: () => xtermRef.current?.focus(),
@@ -257,8 +262,14 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
       safeFit();
     });
 
+
+
     socket.on('ssh:output', (data) => {
       term.write(data);
+      // Forward to sharing relay if active
+      if (onTerminalOutputRef.current) {
+        onTerminalOutputRef.current(data);
+      }
       if (agentCaptureRef.current) {
         agentCaptureRef.current.buffer += data;
         const stripped = stripAnsi(agentCaptureRef.current.buffer);
@@ -350,6 +361,18 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
     return () => clearTimeout(timer);
   }, [isActive]);
 
+  // Close share panel when clicking outside
+  useEffect(() => {
+    if (!showSharePanel) return;
+    const handleClick = (e) => {
+      if (sharePanelRef.current && !sharePanelRef.current.contains(e.target)) {
+        setShowSharePanel(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showSharePanel]);
+
   return (
     <div
       className="terminal-container"
@@ -357,16 +380,83 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
     >
       <div className="terminal-toolbar">
         <div className="toolbar-left">
+          {isSharing && <span className="share-indicator" title="Sharing active" />}
           <span className="terminal-title">
             {connection.local
               ? 'local shell'
               : `${connection.username}@${connection.host}:${connection.port}`
             }
           </span>
+          {isSharing && viewerCount > 0 && (
+            <span className="share-viewer-count">{viewerCount} viewer{viewerCount !== 1 ? 's' : ''}</span>
+          )}
         </div>
-        <button className="disconnect-btn" onClick={onClose}>
-          ✕
-        </button>
+        <div className="toolbar-right">
+          <div className="share-wrapper" ref={sharePanelRef}>
+            <button
+              className={`share-btn ${isSharing ? 'share-btn--active' : ''}`}
+              onClick={() => setShowSharePanel((prev) => !prev)}
+              title={isSharing ? 'Sharing active' : 'Share this terminal'}
+            >
+              {isSharing ? '📡' : '📤'} Share
+            </button>
+            {showSharePanel && (
+              <div className="share-panel">
+                <div className="settings-title">Terminal Sharing</div>
+                {isSharing ? (
+                  <>
+                    <div className="settings-group">
+                      <label className="settings-label">Share Code</label>
+                      <div className="share-code-display">
+                        <code className="share-code">{shareCode}</code>
+                        <button
+                          className="share-copy-btn"
+                          onClick={() => {
+                            navigator.clipboard.writeText(shareCode);
+                          }}
+                          title="Copy to clipboard"
+                        >
+                          📋
+                        </button>
+                      </div>
+                    </div>
+                    {viewerCount > 0 && (
+                      <div className="share-viewers-info">
+                        {viewerCount} viewer{viewerCount !== 1 ? 's' : ''} connected
+                      </div>
+                    )}
+                    <button
+                      className="share-stop-btn"
+                      onClick={() => {
+                        onShareStop?.();
+                        setShowSharePanel(false);
+                      }}
+                    >
+                      ⏹ Stop Sharing
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p className="share-description">
+                      Share this terminal session. A secure code will be generated that others can use to connect.
+                    </p>
+                    <button
+                      className="share-start-btn"
+                      onClick={() => {
+                        onShareStart?.();
+                      }}
+                    >
+                      📡 Start Sharing
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+          <button className="disconnect-btn" onClick={onClose}>
+            ✕
+          </button>
+        </div>
       </div>
       <div className="terminal-viewport" ref={termRef} style={{ flex: 1, minHeight: 0 }} />
     </div>

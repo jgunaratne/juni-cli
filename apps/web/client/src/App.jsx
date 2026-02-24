@@ -1,5 +1,5 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
-import { ConnectionForm, Terminal, GeminiChat } from '@juni/shared-ui';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { ConnectionForm, Terminal, SharedTerminal, GeminiChat } from '@juni/shared-ui';
 
 import './App.css';
 
@@ -73,6 +73,22 @@ function App() {
   const [fontSize, setFontSize] = useState(saved.fontSize || 15);
   const [bgColor, setBgColor] = useState(saved.bgColor || '#0d1117');
 
+  // ── Sharing state ──────────────────────────────────
+  const [sharingEnabled, setSharingEnabled] = useState(() => {
+    const s = loadSettings();
+    return s.sharingEnabled ?? false;
+  });
+  const [relayServerAddr, setRelayServerAddr] = useState(() => {
+    const s = loadSettings();
+    return s.relayServerAddr || '';
+  });
+  const [sharingState, setSharingState] = useState({});  // { [tabId]: { active, code, ws, viewerCount } }
+  const [showConnectDialog, setShowConnectDialog] = useState(false);
+  const [connectCode, setConnectCode] = useState('');
+  const [connectAddr, setConnectAddr] = useState('');
+  const [connectError, setConnectError] = useState('');
+  const connectDialogRef = useRef(null);
+
 
 
   const terminalRefs = useRef({});
@@ -88,8 +104,8 @@ function App() {
   }, [fontFamily]);
 
   useEffect(() => {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ fontFamily, fontSize, bgColor, splitMode, splitLayout }));
-  }, [fontFamily, fontSize, bgColor, splitMode, splitLayout]);
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ fontFamily, fontSize, bgColor, splitMode, splitLayout, sharingEnabled, relayServerAddr }));
+  }, [fontFamily, fontSize, bgColor, splitMode, splitLayout, sharingEnabled, relayServerAddr]);
 
   useEffect(() => {
     document.documentElement.style.setProperty('--terminal-font', `'${fontFamily}', monospace`);
@@ -143,6 +159,185 @@ function App() {
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, [showSettings]);
+
+  // Close connect dialog when clicking outside
+  useEffect(() => {
+    if (!showConnectDialog) return;
+    const handleClick = (e) => {
+      if (connectDialogRef.current && !connectDialogRef.current.contains(e.target)) {
+        setShowConnectDialog(false);
+        setConnectError('');
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showConnectDialog]);
+
+  // Relay server base URL helper
+  const getRelayWsUrl = useCallback((addrOverride) => {
+    const addr = addrOverride || relayServerAddr || window.location.host;
+    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    // If addr already includes protocol, use it as-is
+    if (addr.startsWith('ws://') || addr.startsWith('wss://')) {
+      return `${addr}/share`;
+    }
+    return `${protocol}://${addr}/share`;
+  }, [relayServerAddr]);
+
+  // ── Start sharing a terminal ──────────────────────
+  const handleStartSharing = useCallback((tabId) => {
+    const wsUrl = getRelayWsUrl() + '?role=host';
+    const ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+      console.log('[share] connected to relay as host');
+    };
+
+    ws.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'share-code') {
+          setSharingState((prev) => ({
+            ...prev,
+            [tabId]: { active: true, code: msg.data, ws, viewerCount: 0 },
+          }));
+        } else if (msg.type === 'viewer-joined') {
+          setSharingState((prev) => ({
+            ...prev,
+            [tabId]: { ...prev[tabId], viewerCount: msg.data.count },
+          }));
+        } else if (msg.type === 'viewer-left') {
+          setSharingState((prev) => ({
+            ...prev,
+            [tabId]: { ...prev[tabId], viewerCount: msg.data.count },
+          }));
+        } else if (msg.type === 'input') {
+          // Viewer typed something — send it to the SSH terminal
+          const termRef = terminalRefs.current[tabId];
+          if (termRef) termRef.writeToTerminal(msg.data);
+        } else if (msg.type === 'resize') {
+          // Viewer resized — ignore for now (host controls size)
+        } else if (msg.type === 'expired') {
+          handleStopSharing(tabId);
+        } else if (msg.type === 'error') {
+          console.error('[share] relay error:', msg.data);
+          handleStopSharing(tabId);
+        }
+      } catch {
+        // not JSON — ignore
+      }
+    };
+
+    ws.onclose = () => {
+      setSharingState((prev) => {
+        const next = { ...prev };
+        delete next[tabId];
+        return next;
+      });
+    };
+
+    ws.onerror = (err) => {
+      console.error('[share] WebSocket error:', err);
+    };
+
+    // Set up output forwarding: listen on the Socket.IO connection for ssh:output
+    // and relay it to viewers
+    const termRef = terminalRefs.current[tabId];
+    if (termRef && termRef._getSocket) {
+      // We'll use a different approach: intercept in the next render cycle
+    }
+  }, [getRelayWsUrl]);
+
+  // Forward terminal output to sharing relay
+  useEffect(() => {
+    // For each actively shared tab, we need to forward output
+    const cleanups = [];
+    for (const [tabId, state] of Object.entries(sharingState)) {
+      if (!state.active || !state.ws) continue;
+      const termRef = terminalRefs.current[tabId];
+      if (!termRef) continue;
+      // We'll hook into the xterm by using a MutationObserver approach
+      // Actually, we need to intercept socket.io ssh:output events
+      // The cleanest approach: add an onOutput callback to terminal
+    }
+    return () => cleanups.forEach((fn) => fn());
+  }, [sharingState]);
+
+  const handleStopSharing = useCallback((tabId) => {
+    setSharingState((prev) => {
+      const state = prev[tabId];
+      if (state?.ws) {
+        state.ws.close();
+      }
+      const next = { ...prev };
+      delete next[tabId];
+      return next;
+    });
+  }, []);
+
+  // ── Connect to shared terminal ────────────────────
+  const handleConnectToShared = useCallback(() => {
+    setConnectError('');
+    if (!connectCode.trim()) {
+      setConnectError('Please enter a share code');
+      return;
+    }
+
+    const addr = connectAddr.trim() || relayServerAddr || window.location.host;
+    const wsUrl = getRelayWsUrl(addr) + `?role=viewer&code=${encodeURIComponent(connectCode.trim())}`;
+    const ws = new WebSocket(wsUrl);
+
+    const tabId = nextId++;
+
+    ws.onopen = () => {
+      console.log('[share] connected to relay as viewer');
+    };
+
+    ws.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'connected') {
+          // Successfully joined — create the tab
+          const newTab = {
+            id: tabId,
+            type: 'shared',
+            shareCode: connectCode.trim(),
+            shareWs: ws,
+            status: 'ready',
+          };
+          setTabs((prev) => [...prev, newTab]);
+          setActiveTab(tabId);
+          setShowForm(false);
+          setShowConnectDialog(false);
+          setConnectCode('');
+          setConnectError('');
+        } else if (msg.type === 'output') {
+          // Terminal output from host — write to xterm
+          const termRef = terminalRefs.current[tabId];
+          if (termRef) termRef._writeFromRelay?.(msg.data);
+        } else if (msg.type === 'host-disconnected') {
+          setTabs((prev) =>
+            prev.map((t) => (t.id === tabId ? { ...t, status: 'disconnected' } : t))
+          );
+        } else if (msg.type === 'error') {
+          setConnectError(msg.data);
+          ws.close();
+        }
+      } catch {
+        // not JSON — raw terminal output
+      }
+    };
+
+    ws.onclose = () => {
+      setTabs((prev) =>
+        prev.map((t) => (t.id === tabId && t.type === 'shared' ? { ...t, status: 'disconnected' } : t))
+      );
+    };
+
+    ws.onerror = () => {
+      setConnectError('Failed to connect to relay server');
+    };
+  }, [connectCode, connectAddr, relayServerAddr, getRelayWsUrl]);
 
   // Shift+Tab to toggle focus between split panels
   useEffect(() => {
@@ -287,6 +482,7 @@ function App() {
 
   const getTabLabel = (tab) => {
     if (tab.type === 'gemini') return 'Gemini';
+    if (tab.type === 'shared') return `Shared (${tab.shareCode?.substring(0, 6)}…)`;
     return `${tab.connection.username}@${tab.connection.host}`;
   };
 
@@ -312,6 +508,13 @@ function App() {
           <h1>Juni CLI</h1>
         </div>
         <div className="header-right">
+          <button
+            className="split-toggle split-toggle--connect"
+            onClick={() => setShowConnectDialog(true)}
+            title="Connect to a shared terminal"
+          >
+            🔗 Connect to Shared
+          </button>
           {hasReadySSH && (
             <button
               className={`split-toggle ${splitMode ? 'split-toggle--active' : ''}`}
@@ -468,6 +671,27 @@ function App() {
                     </label>
                   </div>
                 </div>
+                <div className="settings-group">
+                  <label className="settings-label">Terminal Sharing</label>
+                  <label className="auto-execute-toggle">
+                    <input
+                      type="checkbox"
+                      checked={sharingEnabled}
+                      onChange={(e) => setSharingEnabled(e.target.checked)}
+                    />
+                    <span className="auto-execute-label">Enable sharing relay</span>
+                  </label>
+                </div>
+                <div className="settings-group">
+                  <label className="settings-label">Relay Server Address</label>
+                  <input
+                    className="settings-input"
+                    type="text"
+                    value={relayServerAddr}
+                    onChange={(e) => setRelayServerAddr(e.target.value)}
+                    placeholder={window.location.host}
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -484,11 +708,13 @@ function App() {
           {tabs.map((tab) => (
             <div
               key={tab.id}
-              className={`tab ${tab.id === activeTab && !showForm ? 'active' : ''} ${tab.type === 'gemini' ? 'tab--gemini' : ''}`}
+              className={`tab ${tab.id === activeTab && !showForm ? 'active' : ''} ${tab.type === 'gemini' ? 'tab--gemini' : ''} ${tab.type === 'shared' ? 'tab--shared' : ''} ${sharingState[tab.id]?.active ? 'tab--sharing' : ''}`}
               onClick={() => switchTab(tab.id)}
             >
               {tab.type === 'gemini' ? (
                 <span className="tab-gemini-icon">✦</span>
+              ) : tab.type === 'shared' ? (
+                <span className="tab-shared-icon">📡</span>
               ) : (
                 <span className={`tab-status-dot ${tab.status}`} />
               )}
@@ -549,7 +775,17 @@ function App() {
                 fontSize={fontSize}
                 bgColor={bgColor}
                 serverUrl={SERVER_URL}
-
+                isSharing={!!sharingState[tab.id]?.active}
+                shareCode={sharingState[tab.id]?.code || ''}
+                viewerCount={sharingState[tab.id]?.viewerCount || 0}
+                onShareStart={() => handleStartSharing(tab.id)}
+                onShareStop={() => handleStopSharing(tab.id)}
+                onTerminalOutput={(data) => {
+                  const state = sharingState[tab.id];
+                  if (state?.active && state?.ws?.readyState === WebSocket.OPEN) {
+                    state.ws.send(JSON.stringify({ type: 'output', data }));
+                  }
+                }}
               />
             ) : tab.type === 'gemini' ? (
               !splitMode && (
@@ -576,6 +812,29 @@ function App() {
                 )
             ) : null,
           )}
+
+          {/* Shared terminal tabs */}
+          {tabs.filter((t) => t.type === 'shared').map((tab) => (
+            <SharedTerminal
+              key={tab.id}
+              ref={(el) => {
+                if (el) terminalRefs.current[tab.id] = el;
+                else delete terminalRefs.current[tab.id];
+              }}
+              tabId={tab.id}
+              shareWs={tab.shareWs}
+              shareCode={tab.shareCode}
+              isActive={tab.id === activeTab && !showForm}
+              onStatusChange={(status) => handleStatusChange(tab.id, status)}
+              onClose={() => {
+                if (tab.shareWs) tab.shareWs.close();
+                handleCloseTab(tab.id);
+              }}
+              fontFamily={fontFamily}
+              fontSize={fontSize}
+              bgColor={bgColor}
+            />
+          ))}
         </div>
 
         {/* Right panel — Gemini (only in split mode) */}
@@ -608,6 +867,59 @@ function App() {
           </>
         )}
       </main>
+
+      {/* ── Connect to Shared dialog ─────────────────── */}
+      {showConnectDialog && (
+        <div className="connect-shared-overlay">
+          <div className="connect-shared-dialog" ref={connectDialogRef}>
+            <div className="settings-title">Connect to Shared Terminal</div>
+            <div className="settings-group">
+              <label className="settings-label">Relay Server</label>
+              <input
+                className="settings-input"
+                type="text"
+                value={connectAddr}
+                onChange={(e) => setConnectAddr(e.target.value)}
+                placeholder={relayServerAddr || window.location.host}
+              />
+            </div>
+            <div className="settings-group">
+              <label className="settings-label">Share Code</label>
+              <input
+                className="settings-input share-code-input"
+                type="text"
+                value={connectCode}
+                onChange={(e) => setConnectCode(e.target.value)}
+                placeholder="Paste share code here"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleConnectToShared();
+                }}
+              />
+            </div>
+            {connectError && (
+              <div className="share-error">{connectError}</div>
+            )}
+            <div className="connect-shared-actions">
+              <button
+                className="share-start-btn"
+                onClick={handleConnectToShared}
+              >
+                🔗 Connect
+              </button>
+              <button
+                className="settings-reset-btn"
+                onClick={() => {
+                  setShowConnectDialog(false);
+                  setConnectError('');
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

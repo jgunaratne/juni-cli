@@ -4,7 +4,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-const { createGeminiRoutes, createClaudeRoutes, setupSshHandler } = require('@juni/shared-server');
+const { createGeminiRoutes, createClaudeRoutes, setupSshHandler, setupShareRelay } = require('@juni/shared-server');
 
 const DEFAULT_PROJECT = process.env.GCP_PROJECT_ID || '';
 const DEFAULT_LOCATION = process.env.GCP_LOCATION || 'us-central1';
@@ -45,6 +45,7 @@ app.use('/api/claude', createClaudeRoutes({
 }));
 
 setupSshHandler(io);
+setupShareRelay(server);
 
 // Serve built client in production
 const clientDist = path.join(__dirname, '..', 'client', 'dist');
