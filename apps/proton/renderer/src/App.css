@@ -59,6 +59,7 @@
   flex-shrink: 0;
   -webkit-app-region: drag;
   position: relative;
+  font-family: 'Inter', sans-serif;
 }
 
 /* Make buttons/selects clickable in drag region */
@@ -580,6 +581,7 @@
   flex-shrink: 0;
   overflow-x: auto;
   scrollbar-width: none;
+  font-family: 'Inter', sans-serif;
 }
 
 .tab-bar::-webkit-scrollbar {
@@ -1315,6 +1317,7 @@
   background: var(--terminal-bg, #0d1117);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  font-family: 'Inter', sans-serif;
 }
 
 .toolbar-left {
@@ -2140,4 +2143,310 @@
 .agent-skip-btn:hover {
   background: rgba(255, 123, 114, 0.2);
   border-color: rgba(255, 123, 114, 0.5);
+}
+/* ─── Terminal Sharing ────────────────────────────────── */
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.share-wrapper {
+  position: relative;
+}
+
+.share-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.share-btn:hover {
+  color: var(--text-secondary);
+  border-color: rgba(168, 113, 255, 0.3);
+  background: rgba(168, 113, 255, 0.06);
+}
+
+.share-btn--active {
+  color: #bc8cff;
+  border-color: rgba(168, 113, 255, 0.4);
+  background: rgba(168, 113, 255, 0.1);
+  animation: sharePulse 2s ease-in-out infinite;
+}
+
+@keyframes sharePulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(168, 113, 255, 0);
+  }
+
+  50% {
+    box-shadow: 0 0 8px 2px rgba(168, 113, 255, 0.2);
+  }
+}
+
+.share-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 300px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  z-index: 100;
+  animation: settingsFadeIn 0.15s ease-out;
+}
+
+.share-description {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: 0 0 14px;
+}
+
+.share-code-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.share-code {
+  flex: 1;
+  font-family: 'Ubuntu Mono', monospace;
+  font-size: 15px;
+  font-weight: 600;
+  color: #bc8cff;
+  letter-spacing: 0.5px;
+  word-break: break-all;
+  user-select: all;
+}
+
+.share-copy-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.share-copy-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(168, 113, 255, 0.3);
+}
+
+.share-viewers-info {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  color: #7ee787;
+  margin-bottom: 12px;
+  padding: 6px 10px;
+  background: rgba(126, 231, 135, 0.08);
+  border-radius: 6px;
+  text-align: center;
+}
+
+.share-stop-btn {
+  width: 100%;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(255, 123, 114, 0.1);
+  border: 1px solid rgba(255, 123, 114, 0.3);
+  border-radius: 8px;
+  color: #ff7b72;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.share-stop-btn:hover {
+  background: rgba(255, 123, 114, 0.2);
+  border-color: rgba(255, 123, 114, 0.5);
+}
+
+.share-start-btn {
+  width: 100%;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(168, 113, 255, 0.1);
+  border: 1px solid rgba(168, 113, 255, 0.3);
+  border-radius: 8px;
+  color: #bc8cff;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.share-start-btn:hover {
+  background: rgba(168, 113, 255, 0.2);
+  border-color: rgba(168, 113, 255, 0.5);
+}
+
+/* ── Share indicator dot ───────────────────── */
+
+.share-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #bc8cff;
+  box-shadow: 0 0 8px rgba(168, 113, 255, 0.6);
+  animation: shareDotPulse 1.5s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+.share-indicator--viewer {
+  background: #58a6ff;
+  box-shadow: 0 0 8px rgba(88, 166, 255, 0.6);
+}
+
+@keyframes shareDotPulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.share-viewer-count {
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  color: #7ee787;
+  background: rgba(126, 231, 135, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+/* ── Tab sharing styles ────────────────────── */
+
+.tab--sharing {
+  border-bottom-color: rgba(168, 113, 255, 0.5) !important;
+}
+
+.tab--sharing.active {
+  border-bottom-color: #bc8cff !important;
+}
+
+.tab--shared .tab-shared-icon {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.tab--shared.active {
+  border-bottom-color: #58a6ff;
+}
+
+/* ── Connect to Shared header button ───────── */
+
+.split-toggle--connect:hover {
+  color: #bc8cff;
+  border-color: rgba(168, 113, 255, 0.3);
+  background: rgba(168, 113, 255, 0.06);
+}
+
+/* ── Connect to Shared dialog overlay ──────── */
+
+.connect-shared-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.connect-shared-dialog {
+  width: 100%;
+  max-width: 400px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 16px 64px rgba(0, 0, 0, 0.5);
+  animation: fadeUp 0.2s ease-out;
+}
+
+.share-code-input {
+  font-family: 'Ubuntu Mono', monospace !important;
+  font-size: 14px !important;
+  letter-spacing: 0.5px;
+}
+
+.share-error {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: #ff7b72;
+  padding: 8px 10px;
+  background: rgba(255, 123, 114, 0.08);
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+
+.connect-shared-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.connect-shared-actions .share-start-btn {
+  flex: 1;
+}
+
+.connect-shared-actions .settings-reset-btn {
+  flex-shrink: 0;
 }
