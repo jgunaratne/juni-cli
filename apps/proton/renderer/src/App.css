@@ -7,6 +7,13 @@
   z-index: 1;
 }
 
+.app button,
+.app select,
+.app input,
+.app label {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+}
 /* ─── Proton loading screen ───────────────────────────────── */
 .proton-loading {
   flex: 1;
@@ -1378,7 +1385,7 @@
   color: var(--text-primary);
 }
 .disconnect-btn {
-  height: 28px;
+  height: 30px;
   padding: 0 12px;
   display: flex;
   align-items: center;
