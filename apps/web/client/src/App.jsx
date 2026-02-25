@@ -534,7 +534,7 @@ function App() {
                 onClick={sendToTerminal}
                 title="Paste highlighted Gemini text into terminal"
               >
-                → Terminal
+                ← Terminal
               </button>
             </div>
           )}
