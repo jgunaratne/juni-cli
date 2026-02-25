@@ -2,6 +2,7 @@
   "name": "juni-cli-proton",
   "version": "1.0.0",
   "description": "Agentic CLI desktop application",
+  "homepage": "https://github.com/jgunaratne/juni-cli",
   "author": "Junius Gunaratne <junius@gunaratne.com>",
   "main": "main.js",
   "scripts": {
