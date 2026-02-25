@@ -135,7 +135,7 @@ export default function ConnectionForm({ onConnect, onLocalConnect }) {
             </button>
 
             <div className="form-divider">
-              <span className="form-divider-text">or connect via SSH</span>
+              <span className="form-divider-text">or connect remotely</span>
             </div>
           </>
         )}
@@ -244,7 +244,7 @@ export default function ConnectionForm({ onConnect, onLocalConnect }) {
 
           <button type="submit" className="connect-btn">
             <span className="btn-icon">→</span>
-            Connect via SSH
+            Connect
           </button>
         </form>
       </div>
