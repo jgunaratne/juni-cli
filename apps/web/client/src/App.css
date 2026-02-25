@@ -782,6 +782,13 @@
   align-items: center;
   justify-content: center;
   padding: 24px;
+  font-family: 'Inter', sans-serif;
+  }
+  
+  .connection-form-container {
+    width: 100%;
+    max-width: 460px;
+    animation: fadeUp 0.4s ease-out;
 }
 
 .connection-form {

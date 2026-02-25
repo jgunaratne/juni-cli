@@ -930,6 +930,7 @@
   align-items: center;
   justify-content: center;
   padding: 24px;
+  font-family: 'Inter', sans-serif;
 }
 
 .connection-form-container {
