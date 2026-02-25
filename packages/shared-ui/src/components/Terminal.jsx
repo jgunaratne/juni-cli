@@ -17,7 +17,7 @@ const stripAnsi = (str) => str
   .replace(/\[[\?]?[0-9;]*[a-zA-Z]/g, '')
   .replace(/\r/g, '');
 
-const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onStatusChange, onClose, fontFamily, fontSize, bgColor, serverUrl, isSharing, shareCode, viewerCount, onShareStart, onShareStop, onTerminalOutput }, ref) {
+const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onStatusChange, onClose, fontFamily, fontSize, bgColor, serverUrl, isSharing, shareCode, viewerCount, onShareStart, onShareStop, onTerminalOutput, onSendToGemini }, ref) {
   const [showSharePanel, setShowSharePanel] = useState(false);
   const sharePanelRef = useRef(null);
   const termRef = useRef(null);
@@ -392,6 +392,11 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
           )}
         </div>
         <div className="toolbar-right">
+          {onSendToGemini && (
+            <button className="disconnect-btn send-to-gemini-btn" onClick={onSendToGemini} title="Copy terminal output to Gemini input">
+              → Gemini
+            </button>
+          )}
           <div className="share-wrapper" ref={sharePanelRef}>
             <button
               className={`share-btn ${isSharing ? 'share-btn--active' : ''}`}

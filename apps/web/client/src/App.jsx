@@ -517,37 +517,19 @@ function App() {
               onClick={toggleSplit}
               title={splitMode ? 'Hide Gemini panel' : 'Show Gemini panel'}
             >
-              {splitMode ? 'Hide Gemini' : 'Show Gemini'}
+              Gemini
             </button>
           )}
-          {splitMode && activeSession?.type === 'ssh' && (
-            <div className="split-btn-group">
-              <button
-                className="split-btn-group__btn"
-                onClick={sendToGemini}
-                title="Copy terminal output to Gemini input"
-              >
-                → Gemini
-              </button>
-              <button
-                className="split-btn-group__btn"
-                onClick={sendToTerminal}
-                title="Paste highlighted Gemini text into terminal"
-              >
-                ← Terminal
-              </button>
-            </div>
-          )}
           {hasReadySSH && (
-              <select
-                className="model-selector"
-                value={selectedModel}
-                onChange={(e) => setSelectedModel(e.target.value)}
-                title="Select Gemini model"
-              >
-                {GEMINI_MODELS.map((m) => (
-                  <option key={m.id} value={m.id}>{m.label}</option>
-                ))}
+            <select
+              className="model-selector"
+              value={selectedModel}
+              onChange={(e) => setSelectedModel(e.target.value)}
+              title="Select Gemini model"
+            >
+              {GEMINI_MODELS.map((m) => (
+                <option key={m.id} value={m.id}>{m.label}</option>
+              ))}
             </select>
           )}
           <div className="settings-wrapper" ref={settingsRef}>
@@ -556,7 +538,7 @@ function App() {
               onClick={() => setShowSettings((prev) => !prev)}
               title="Settings"
             >
-              ⚙
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
             </span>
             {showSettings && (
               <div className="settings-panel">
@@ -678,7 +660,7 @@ function App() {
               onClick={() => switchTab(tab.id)}
             >
               {tab.type === 'gemini' ? (
-                <span className="tab-gemini-icon">✦</span>
+                <span className={`tab-status-dot ${tab.status}`} />
               ) : tab.type === 'shared' ? (
                 <span className="tab-shared-icon">📡</span>
               ) : (
@@ -695,7 +677,7 @@ function App() {
                 }}
                 title="Close session"
               >
-                ✕
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
               </button>
             </div>
           ))}
@@ -703,7 +685,7 @@ function App() {
           {/* ── New tab buttons ─────────────────────────── */}
           <div className="tab-new-group">
             <button className="tab-new" onClick={handleNewTab} title="New SSH connection">
-              +
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
             </button>
             {hasReadySSH && (
               <button
@@ -711,7 +693,7 @@ function App() {
                 onClick={handleOpenGemini}
                 title="New Gemini chat"
               >
-                ✦
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l2.09 6.26L20 10l-5 4.74L16.18 22 12 18.27 7.82 22 9 14.74 4 10l5.91-1.74z" /></svg>
               </button>
             )}
           </div>
@@ -752,6 +734,7 @@ function App() {
                     state.ws.send(JSON.stringify({ type: 'output', data }));
                   }
                 }}
+                onSendToGemini={splitMode ? sendToGemini : undefined}
               />
             ) : tab.type === 'gemini' ? (
               !splitMode && (
@@ -778,6 +761,7 @@ function App() {
                     onStepThroughChange={setStepThrough}
                     autoExecute={autoExecute}
                     onAutoExecuteChange={setAutoExecute}
+                    onSendToTerminal={splitMode ? sendToTerminal : undefined}
                 />
                 )
             ) : null,
@@ -836,6 +820,7 @@ function App() {
                 onStepThroughChange={setStepThrough}
                 autoExecute={autoExecute}
                 onAutoExecuteChange={setAutoExecute}
+                onSendToTerminal={sendToTerminal}
               />
             </div>
           </>

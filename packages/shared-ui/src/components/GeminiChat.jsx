@@ -86,6 +86,7 @@ const GeminiChat = forwardRef(function GeminiChat({
   onStepThroughChange,
   autoExecute = false,
   onAutoExecuteChange,
+  onSendToTerminal,
   serverUrl,
 }, ref) {
   const pastedTextRef = useRef(null);
@@ -794,8 +795,13 @@ const GeminiChat = forwardRef(function GeminiChat({
               + New Chat
             </button>
           )}
+          {onSendToTerminal && !agentRunning && (
+            <button className="disconnect-btn send-to-terminal-btn" onClick={onSendToTerminal} title="Paste highlighted Gemini text into terminal">
+              ← Terminal
+            </button>
+          )}
           <button className="disconnect-btn" onClick={handleClear} title="Clear screen">
-            ⌫
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
           </button>
         </div>
       </div>

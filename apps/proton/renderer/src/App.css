@@ -727,16 +727,17 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
+  width: 30px;
+    height: 26px;
   flex-shrink: 0;
   background: transparent;
-  border: none;
+  border: 1px solid var(--border);
   color: var(--text-muted);
-  font-size: 18px;
-  font-weight: 300;
+  font-size: 16px;
+    font-weight: 400;
   cursor: pointer;
-  transition: color 0.15s, background 0.15s;
-  border-radius: 4px;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+    border-radius: 6px;
   margin: 4px 2px;
 }
 
