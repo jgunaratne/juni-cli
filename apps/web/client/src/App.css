@@ -52,7 +52,7 @@
 .header-right {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 
 .split-toggle {
@@ -1541,7 +1541,7 @@
 .toolbar-right-group {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 
 .agent-stop-btn {
@@ -1935,7 +1935,7 @@
 .toolbar-right {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 
 .share-wrapper {
