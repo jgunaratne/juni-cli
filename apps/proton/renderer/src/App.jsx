@@ -578,7 +578,6 @@ function App() {
             </div>
           )}
           {hasReadySSH && (
-            <>
               <select
                 className="model-selector"
                 value={selectedModel}
@@ -588,33 +587,7 @@ function App() {
                 {GEMINI_MODELS.map((m) => (
                   <option key={m.id} value={m.id}>{m.label}</option>
                 ))}
-              </select>
-              <label className="auto-execute-toggle" title="When enabled, clicking a command will execute it immediately">
-                <input
-                  type="checkbox"
-                  checked={autoExecute}
-                  onChange={(e) => setAutoExecute(e.target.checked)}
-                />
-                <span className="auto-execute-label">Auto-execute</span>
-              </label>
-              <button
-                className={`agent-toggle ${agentMode ? 'agent-toggle--active' : ''}`}
-                onClick={() => setAgentMode((prev) => !prev)}
-                title={agentMode ? 'Disable agent mode' : 'Enable agent mode: Gemini can execute commands autonomously'}
-              >
-                <span className="agent-toggle-icon">⚡</span>
-                {agentMode ? 'Agent ON' : 'Agent'}
-              </button>
-              {agentMode && (
-                <button
-                  className={`agent-toggle ${stepThrough ? 'agent-toggle--active' : ''}`}
-                  onClick={() => setStepThrough((prev) => !prev)}
-                  title={stepThrough ? 'Disable step-through: commands run automatically' : 'Enable step-through: approve each command before it runs'}
-                >
-                  {stepThrough ? '⏯ Step ON' : '⏯ Step'}
-                </button>
-              )}
-            </>
+            </select>
           )}
           <div className="settings-wrapper" ref={settingsRef}>
             <span
@@ -832,6 +805,7 @@ function App() {
                   onClose={() => handleCloseTab(tab.id)}
                   onRunCommand={handleRunCommand}
                   agentMode={agentMode}
+                    onAgentModeChange={setAgentMode}
                   onRunAgentCommand={handleRunAgentCommand}
                   onSendAgentKeys={handleSendAgentKeys}
                   onAbortAgentCapture={handleAbortAgentCapture}
@@ -846,6 +820,9 @@ function App() {
                     return termRef ? termRef.getBufferText() : '(Terminal ref not found)';
                   }}
                   stepThrough={stepThrough}
+                    onStepThroughChange={setStepThrough}
+                    autoExecute={autoExecute}
+                    onAutoExecuteChange={setAutoExecute}
                     serverUrl={serverUrl}
                 />
                 )
@@ -890,6 +867,7 @@ function App() {
                 onClose={() => setSplitMode(false)}
                 onRunCommand={handleRunCommand}
                 agentMode={agentMode}
+                onAgentModeChange={setAgentMode}
                 onRunAgentCommand={handleRunAgentCommand}
                 onSendAgentKeys={handleSendAgentKeys}
                 onAbortAgentCapture={handleAbortAgentCapture}
@@ -904,6 +882,9 @@ function App() {
                   return termRef ? termRef.getBufferText() : '(Terminal ref not found)';
                 }}
                 stepThrough={stepThrough}
+                onStepThroughChange={setStepThrough}
+                autoExecute={autoExecute}
+                onAutoExecuteChange={setAutoExecute}
                 serverUrl={serverUrl}
               />
             </div>

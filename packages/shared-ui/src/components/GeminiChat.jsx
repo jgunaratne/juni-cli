@@ -77,11 +77,15 @@ const GeminiChat = forwardRef(function GeminiChat({
   onStatusChange,
   onRunCommand,
   agentMode = false,
+  onAgentModeChange,
   onRunAgentCommand,
   onSendAgentKeys,
   onAbortAgentCapture,
   onReadTerminal,
   stepThrough = false,
+  onStepThroughChange,
+  autoExecute = false,
+  onAutoExecuteChange,
   serverUrl,
 }, ref) {
   const pastedTextRef = useRef(null);
@@ -757,6 +761,35 @@ const GeminiChat = forwardRef(function GeminiChat({
             <button className="disconnect-btn agent-retry-btn" onClick={retryAgent}>
               ↻ Retry
             </button>
+          )}
+          {!agentRunning && (
+            <>
+              <button
+                className={`disconnect-btn agent-mode-toggle ${agentMode ? 'agent-mode-toggle--active' : ''}`}
+                onClick={() => onAgentModeChange?.(!agentMode)}
+                title={agentMode ? 'Disable agent mode' : 'Enable agent mode'}
+              >
+                ⚡ {agentMode ? 'Agent ON' : 'Agent'}
+              </button>
+              {agentMode && (
+                <button
+                  className={`disconnect-btn agent-mode-toggle ${stepThrough ? 'agent-mode-toggle--active' : ''}`}
+                  onClick={() => onStepThroughChange?.(!stepThrough)}
+                  title={stepThrough ? 'Disable step-through' : 'Enable step-through'}
+                >
+                  {stepThrough ? '⏯ Step ON' : '⏯ Step'}
+                </button>
+              )}
+              <label className="disconnect-btn agent-mode-toggle auto-exec-label" title="When enabled, clicking a command will execute it immediately">
+                <input
+                  type="checkbox"
+                  checked={autoExecute}
+                  onChange={(e) => onAutoExecuteChange?.(e.target.checked)}
+                  style={{ margin: '0 4px 0 0' }}
+                />
+                Auto-exec
+              </label>
+            </>
           )}
           {!agentRunning && (
             <button className="disconnect-btn new-chat-btn" onClick={handleNewChat} title="Start a new chat">
