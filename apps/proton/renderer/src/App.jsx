@@ -190,7 +190,10 @@ function App() {
     if (addr.startsWith('ws://') || addr.startsWith('wss://')) {
       return `${addr}/share`;
     }
-    return `ws://${addr}/share`;
+    // Use wss:// for remote hosts, ws:// for localhost
+    const isLocal = addr.startsWith('localhost') || addr.startsWith('127.0.0.1');
+    const protocol = isLocal ? 'ws' : 'wss';
+    return `${protocol}://${addr}/share`;
   }, [relayServerAddr, serverUrl]);
 
   // ── Start sharing a terminal ──────────────────────
@@ -282,6 +285,7 @@ function App() {
 
     const addr = connectAddr.trim() || relayServerAddr || (serverUrl ? new URL(serverUrl).host : 'localhost');
     const wsUrl = getRelayWsUrl(addr) + `?role=viewer&code=${encodeURIComponent(connectCode.trim())}`;
+    console.log('[share] connecting to relay:', wsUrl, '(addr:', addr, ')');
     const ws = new WebSocket(wsUrl);
 
     const tabId = nextId++;
@@ -307,9 +311,6 @@ function App() {
           setShowConnectDialog(false);
           setConnectCode('');
           setConnectError('');
-        } else if (msg.type === 'output') {
-          const termRef = terminalRefs.current[tabId];
-          if (termRef) termRef._writeFromRelay?.(msg.data);
         } else if (msg.type === 'host-disconnected') {
           setTabs((prev) =>
             prev.map((t) => (t.id === tabId ? { ...t, status: 'disconnected' } : t))

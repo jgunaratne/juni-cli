@@ -311,10 +311,6 @@ function App() {
           setShowConnectDialog(false);
           setConnectCode('');
           setConnectError('');
-        } else if (msg.type === 'output') {
-          // Terminal output from host — write to xterm
-          const termRef = terminalRefs.current[tabId];
-          if (termRef) termRef._writeFromRelay?.(msg.data);
         } else if (msg.type === 'host-disconnected') {
           setTabs((prev) =>
             prev.map((t) => (t.id === tabId ? { ...t, status: 'disconnected' } : t))
