@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const url = require('url');
 
 const MAX_SESSIONS = 10;
-const SESSION_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 /**
  * Attach a WebSocket relay server to the given HTTP server

@@ -93,6 +93,7 @@ function App() {
   const settingsRef = useRef(null);
   const connectDialogRef = useRef(null);
   const isDragging = useRef(false);
+  const lastSshTabId = useRef(null);
   const mainRef = useRef(null);
 
   // Discover server port from Electron main process
@@ -364,6 +365,7 @@ function App() {
     setTabs((prev) => [...prev, newTab]);
     setActiveTab(id);
     setShowForm(false);
+    lastSshTabId.current = id;
   }, []);
 
   const handleLocalConnect = useCallback(() => {
@@ -377,6 +379,7 @@ function App() {
     setTabs((prev) => [...prev, newTab]);
     setActiveTab(id);
     setShowForm(false);
+    lastSshTabId.current = id;
   }, []);
 
   const handleOpenGemini = useCallback(() => {
@@ -422,7 +425,11 @@ function App() {
   const switchTab = useCallback((tabId) => {
     setActiveTab(tabId);
     setShowForm(false);
-  }, []);
+    const tab = tabs.find((t) => t.id === tabId);
+    if (tab && tab.type === 'ssh') {
+      lastSshTabId.current = tabId;
+    }
+  }, [tabs]);
 
   const toggleSplit = useCallback(() => {
     setSplitMode((prev) => !prev);
@@ -451,7 +458,9 @@ function App() {
   const handleRunCommand = useCallback((cmd) => {
     const sshTabId = activeTab && tabs.find((t) => t.id === activeTab && t.type === 'ssh')
       ? activeTab
-      : tabs.find((t) => t.type === 'ssh')?.id;
+      : (lastSshTabId.current && tabs.find((t) => t.id === lastSshTabId.current && t.type === 'ssh'))
+        ? lastSshTabId.current
+        : tabs.find((t) => t.type === 'ssh')?.id;
     if (!sshTabId) return;
     const termRef = terminalRefs.current[sshTabId];
     if (!termRef) return;
@@ -462,7 +471,9 @@ function App() {
   const handleRunAgentCommand = useCallback(async (command) => {
     const sshTabId = activeTab && tabs.find((t) => t.id === activeTab && t.type === 'ssh')
       ? activeTab
-      : tabs.find((t) => t.type === 'ssh')?.id;
+      : (lastSshTabId.current && tabs.find((t) => t.id === lastSshTabId.current && t.type === 'ssh'))
+        ? lastSshTabId.current
+        : tabs.find((t) => t.type === 'ssh')?.id;
     if (!sshTabId) return '(No SSH terminal connected)';
     const termRef = terminalRefs.current[sshTabId];
     if (!termRef) return '(Terminal ref not found)';
@@ -472,7 +483,9 @@ function App() {
   const handleSendAgentKeys = useCallback(async (keys) => {
     const sshTabId = activeTab && tabs.find((t) => t.id === activeTab && t.type === 'ssh')
       ? activeTab
-      : tabs.find((t) => t.type === 'ssh')?.id;
+      : (lastSshTabId.current && tabs.find((t) => t.id === lastSshTabId.current && t.type === 'ssh'))
+        ? lastSshTabId.current
+        : tabs.find((t) => t.type === 'ssh')?.id;
     if (!sshTabId) return '(No SSH terminal connected)';
     const termRef = terminalRefs.current[sshTabId];
     if (!termRef) return '(Terminal ref not found)';
@@ -482,7 +495,9 @@ function App() {
   const handleAbortAgentCapture = useCallback(() => {
     const sshTabId = activeTab && tabs.find((t) => t.id === activeTab && t.type === 'ssh')
       ? activeTab
-      : tabs.find((t) => t.type === 'ssh')?.id;
+      : (lastSshTabId.current && tabs.find((t) => t.id === lastSshTabId.current && t.type === 'ssh'))
+        ? lastSshTabId.current
+        : tabs.find((t) => t.type === 'ssh')?.id;
     if (!sshTabId) return;
     const termRef = terminalRefs.current[sshTabId];
     if (termRef) termRef.abortAgentCapture();
@@ -533,7 +548,7 @@ function App() {
             onClick={() => setShowConnectDialog(true)}
             title="Connect to a shared terminal"
           >
-            🔗 Connect to Shared
+            Connect to Shared
           </button>
           {hasReadySSH && (
             <button
@@ -824,7 +839,11 @@ function App() {
                   onSendAgentKeys={handleSendAgentKeys}
                   onAbortAgentCapture={handleAbortAgentCapture}
                   onReadTerminal={() => {
-                    const sshTabId = activeTab && tabs.find((t) => t.id === activeTab && t.type === 'ssh') ? activeTab : tabs.find((t) => t.type === 'ssh')?.id;
+                    const sshTabId = activeTab && tabs.find((t) => t.id === activeTab && t.type === 'ssh')
+                      ? activeTab
+                      : (lastSshTabId.current && tabs.find((t) => t.id === lastSshTabId.current && t.type === 'ssh'))
+                        ? lastSshTabId.current
+                        : tabs.find((t) => t.type === 'ssh')?.id;
                     if (!sshTabId) return '(No terminal connected)';
                     const termRef = terminalRefs.current[sshTabId];
                     return termRef ? termRef.getBufferText() : '(Terminal ref not found)';
@@ -878,7 +897,11 @@ function App() {
                 onSendAgentKeys={handleSendAgentKeys}
                 onAbortAgentCapture={handleAbortAgentCapture}
                 onReadTerminal={() => {
-                  const sshTabId = activeTab && tabs.find((t) => t.id === activeTab && t.type === 'ssh') ? activeTab : tabs.find((t) => t.type === 'ssh')?.id;
+                  const sshTabId = activeTab && tabs.find((t) => t.id === activeTab && t.type === 'ssh')
+                    ? activeTab
+                    : (lastSshTabId.current && tabs.find((t) => t.id === lastSshTabId.current && t.type === 'ssh'))
+                      ? lastSshTabId.current
+                      : tabs.find((t) => t.type === 'ssh')?.id;
                   if (!sshTabId) return '(No terminal connected)';
                   const termRef = terminalRefs.current[sshTabId];
                   return termRef ? termRef.getBufferText() : '(Terminal ref not found)';

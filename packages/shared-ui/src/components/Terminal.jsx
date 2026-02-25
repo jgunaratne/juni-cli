@@ -398,7 +398,7 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
               onClick={() => setShowSharePanel((prev) => !prev)}
               title={isSharing ? 'Sharing active' : 'Share this terminal'}
             >
-              {isSharing ? '📡' : '📤'} Share
+              {isSharing && <span className="share-indicator" style={{ width: 6, height: 6, background: '#56d364', boxShadow: '0 0 6px rgba(86, 211, 100, 0.6)' }} />} Share
             </button>
             {showSharePanel && (
               <div className="share-panel">
@@ -446,7 +446,7 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
                         onShareStart?.();
                       }}
                     >
-                      📡 Start Sharing
+                        Start Sharing
                     </button>
                   </>
                 )}
