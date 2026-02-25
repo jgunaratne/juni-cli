@@ -509,7 +509,7 @@ function App() {
             onClick={() => setShowConnectDialog(true)}
             title="Connect to a shared terminal"
           >
-            🔗 Connect to Shared
+            Connect to Shared
           </button>
           {hasReadySSH && (
             <button
@@ -901,7 +901,7 @@ function App() {
                 className="share-start-btn"
                 onClick={handleConnectToShared}
               >
-                🔗 Connect
+                Connect
               </button>
               <button
                 className="settings-reset-btn"

@@ -951,7 +951,7 @@ function App() {
                 className="share-start-btn"
                 onClick={handleConnectToShared}
               >
-                🔗 Connect
+                Connect
               </button>
               <button
                 className="settings-reset-btn"
