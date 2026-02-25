@@ -780,15 +780,13 @@ const GeminiChat = forwardRef(function GeminiChat({
                   {stepThrough ? '⏯ Step ON' : '⏯ Step'}
                 </button>
               )}
-              <label className="disconnect-btn agent-mode-toggle auto-exec-label" title="When enabled, clicking a command will execute it immediately">
-                <input
-                  type="checkbox"
-                  checked={autoExecute}
-                  onChange={(e) => onAutoExecuteChange?.(e.target.checked)}
-                  style={{ margin: '0 4px 0 0' }}
-                />
-                Auto-exec
-              </label>
+              <button
+                className={`disconnect-btn agent-mode-toggle ${autoExecute ? 'auto-exec--active' : ''}`}
+                onClick={() => onAutoExecuteChange?.(!autoExecute)}
+                title="When enabled, clicking a command will execute it immediately"
+              >
+                {autoExecute ? 'Auto-exec ON' : 'Auto-exec'}
+              </button>
             </>
           )}
           {!agentRunning && (
