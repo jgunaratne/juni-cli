@@ -392,11 +392,6 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
           )}
         </div>
         <div className="toolbar-right">
-          {onSendToGemini && (
-            <button className="disconnect-btn send-to-gemini-btn" onClick={onSendToGemini} title="Copy terminal output to Gemini input">
-              → Gemini
-            </button>
-          )}
           <div className="share-wrapper" ref={sharePanelRef}>
             <button
               className={`share-btn ${isSharing ? 'share-btn--active' : ''}`}
@@ -458,6 +453,11 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
               </div>
             )}
           </div>
+          {onSendToGemini && (
+            <button className="disconnect-btn send-to-gemini-btn" onClick={onSendToGemini} title="Copy terminal output to Gemini input">
+              → Gemini
+            </button>
+          )}
           <button className="disconnect-btn" onClick={onClose}>
             ✕
           </button>

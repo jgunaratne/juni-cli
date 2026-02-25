@@ -1423,7 +1423,7 @@
   color: var(--text-muted) !important;
   border-color: var(--border) !important;
   background: transparent !important;
-  font-size: 11px !important;
+  font-size: 12px !important;
 }
 
 .agent-mode-toggle--active {
@@ -1444,6 +1444,18 @@
 
 .auto-exec--active:hover {
   border-color: rgba(63, 185, 80, 0.6) !important;
+}
+.send-to-gemini-btn,
+.send-to-terminal-btn {
+  color: var(--text-muted) !important;
+  border-color: var(--border) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+
+.send-to-gemini-btn:hover,
+.send-to-terminal-btn:hover {
+  color: var(--text-secondary) !important;
+  border-color: var(--border-hover, var(--border)) !important;
 }
 .terminal-viewport {
   flex: 1;
@@ -2231,7 +2243,7 @@
   border-radius: 6px;
   color: var(--text-muted);
   font-family: 'Inter', sans-serif;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
