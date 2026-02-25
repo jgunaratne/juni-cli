@@ -126,14 +126,14 @@
 .header-right {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 4px;
 }
 
 .split-toggle {
   display: flex;
   align-items: center;
   gap: 6px;
-  height: 30px;
+  height: 28px;
   padding: 0 12px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border);
@@ -195,7 +195,7 @@
   color: var(--text-secondary);
   border: none;
   padding: 0 10px;
-    height: 30px;
+    height: 28px;
   font-family: 'Inter', sans-serif;
   font-size: 12px;
   cursor: pointer;
@@ -212,7 +212,7 @@
   background: rgba(210, 153, 34, 0.1);
 }
 .model-selector {
-  height: 30px;
+  height: 28px;
   padding: 0 28px 0 10px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border);
@@ -250,7 +250,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 30px;
+  height: 28px;
   padding: 0 10px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border);
@@ -322,7 +322,7 @@
 
 .settings-gear {
   width: 30px;
-  height: 30px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1386,7 +1386,7 @@
   color: var(--text-primary);
 }
 .disconnect-btn {
-  height: 30px;
+  height: 28px;
   padding: 0 12px;
   display: flex;
   align-items: center;
@@ -1744,7 +1744,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  height: 30px;
+  height: 28px;
   padding: 0 12px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border);
@@ -1825,7 +1825,7 @@
 .toolbar-right-group {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .agent-stop-btn {
@@ -2184,7 +2184,7 @@
 }
 
 .agent-approve-btn {
-  height: 30px;
+  height: 28px;
   padding: 0 14px;
   background: rgba(86, 211, 100, 0.12);
   border: 1px solid rgba(86, 211, 100, 0.3);
@@ -2203,7 +2203,7 @@
 }
 
 .agent-skip-btn {
-  height: 30px;
+  height: 28px;
   padding: 0 14px;
   background: rgba(255, 123, 114, 0.1);
   border: 1px solid rgba(255, 123, 114, 0.3);
@@ -2225,7 +2225,7 @@
 .toolbar-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
 }
 
 .share-wrapper {
