@@ -175,6 +175,34 @@
   background: rgba(210, 153, 34, 0.08);
 }
 
+/* Split button group */
+.split-btn-group {
+  display: flex;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.split-btn-group__btn {
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  padding: 4px 10px;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.split-btn-group__btn:first-child {
+  border-right: 1px solid var(--border);
+}
+
+.split-btn-group__btn:hover {
+  color: #d29922;
+  background: rgba(210, 153, 34, 0.1);
+}
 .model-selector {
   height: 30px;
   padding: 0 28px 0 10px;

@@ -517,29 +517,26 @@ function App() {
               onClick={toggleSplit}
               title={splitMode ? 'Hide Gemini panel' : 'Show Gemini panel'}
             >
-              <span className="split-toggle-icon">⬡</span>
               {splitMode ? 'Hide Gemini' : 'Show Gemini'}
             </button>
           )}
           {splitMode && activeSession?.type === 'ssh' && (
-            <>
+            <div className="split-btn-group">
               <button
-                className="split-toggle split-toggle--send"
+                className="split-btn-group__btn"
                 onClick={sendToGemini}
                 title="Copy terminal output to Gemini input"
               >
-                <span className="split-toggle-icon">→✦</span>
-                Send to Gemini
+                → Gemini
               </button>
               <button
-                className="split-toggle split-toggle--send"
+                className="split-btn-group__btn"
                 onClick={sendToTerminal}
                 title="Paste highlighted Gemini text into terminal"
               >
-                <span className="split-toggle-icon">✦→</span>
-                Send to Terminal
+                → Terminal
               </button>
-            </>
+            </div>
           )}
           {hasReadySSH && (
             <>
