@@ -9,7 +9,7 @@ import '@xterm/xterm/css/xterm.css';
  * to a shared terminal session via a WebSocket relay server.
  * It receives output from the host and sends input back.
  */
-const SharedTerminal = forwardRef(function SharedTerminal({ tabId, shareWs, shareCode, isActive, onStatusChange, onClose, fontFamily, fontSize, bgColor }, ref) {
+const SharedTerminal = forwardRef(function SharedTerminal({ tabId, shareWs, shareCode, isActive, status, onStatusChange, onReconnect, onClose, fontFamily, fontSize, bgColor }, ref) {
   const termRef = useRef(null);
   const xtermRef = useRef(null);
   const fitRef = useRef(null);
@@ -171,6 +171,14 @@ const SharedTerminal = forwardRef(function SharedTerminal({ tabId, shareWs, shar
           </span>
         </div>
         <div className="toolbar-right">
+          {status === 'disconnected' && onReconnect && (
+            <button className="console-btn" onClick={onReconnect} title="Reconnect">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 4 23 10 17 10" />
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+              </svg>
+            </button>
+          )}
           <button className="disconnect-btn" onClick={onClose}>
             ✕
           </button>

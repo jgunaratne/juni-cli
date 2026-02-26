@@ -303,6 +303,7 @@ function App() {
             id: tabId,
             type: 'shared',
             shareCode: connectCode.trim(),
+            shareAddr: addr,
             shareWs: ws,
             status: 'ready',
           };
@@ -335,6 +336,61 @@ function App() {
       setConnectError('Failed to connect to relay server');
     };
   }, [connectCode, connectAddr, relayServerAddr, serverUrl, getRelayWsUrl]);
+
+  // ── Reconnect to shared terminal ──────────────────
+  const handleReconnectShared = useCallback((tabId) => {
+    const tab = tabs.find((t) => t.id === tabId && t.type === 'shared');
+    if (!tab) return;
+
+    // Close old WS if still lingering
+    if (tab.shareWs) {
+      try { tab.shareWs.close(); } catch { /* ignore */ }
+    }
+
+    const wsUrl = getRelayWsUrl(tab.shareAddr) + `?role=viewer&code=${encodeURIComponent(tab.shareCode)}`;
+    const ws = new WebSocket(wsUrl);
+
+    setTabs((prev) =>
+      prev.map((t) => (t.id === tabId ? { ...t, status: 'connecting' } : t))
+    );
+
+    ws.onopen = () => {
+      console.log('[share] reconnected to relay as viewer');
+    };
+
+    ws.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'connected') {
+          setTabs((prev) =>
+            prev.map((t) => (t.id === tabId ? { ...t, shareWs: ws, status: 'ready' } : t))
+          );
+        } else if (msg.type === 'host-disconnected') {
+          setTabs((prev) =>
+            prev.map((t) => (t.id === tabId ? { ...t, status: 'disconnected' } : t))
+          );
+        } else if (msg.type === 'error') {
+          console.error('[share] reconnect error:', msg.data);
+          setTabs((prev) =>
+            prev.map((t) => (t.id === tabId ? { ...t, status: 'disconnected' } : t))
+          );
+          ws.close();
+        }
+      } catch { /* ignore */ }
+    };
+
+    ws.onclose = () => {
+      setTabs((prev) =>
+        prev.map((t) => (t.id === tabId && t.type === 'shared' ? { ...t, status: 'disconnected' } : t))
+      );
+    };
+
+    ws.onerror = () => {
+      setTabs((prev) =>
+        prev.map((t) => (t.id === tabId ? { ...t, status: 'disconnected' } : t))
+      );
+    };
+  }, [tabs, getRelayWsUrl]);
 
   useEffect(() => {
     if (!splitMode) return;
@@ -816,7 +872,9 @@ function App() {
               shareWs={tab.shareWs}
               shareCode={tab.shareCode}
               isActive={tab.id === activeTab && !showForm}
+              status={tab.status}
               onStatusChange={(status) => handleStatusChange(tab.id, status)}
+              onReconnect={() => handleReconnectShared(tab.id)}
               onClose={() => {
                 if (tab.shareWs) tab.shareWs.close();
                 handleCloseTab(tab.id);
