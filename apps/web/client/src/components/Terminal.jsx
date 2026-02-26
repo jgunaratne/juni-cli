@@ -156,8 +156,9 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
           }
         }, 60000);
         agentCaptureRef.current = { buffer: '', resolve, timer };
-        // Send the command with sentinel
-        socketRef.current.emit('ssh:data', `${command}; echo ${AGENT_SENTINEL}\n`);
+        // Send the command with sentinel on a NEW LINE so heredocs & multi-line
+        // commands finish before the sentinel echo runs.
+        socketRef.current.emit('ssh:data', `${command}\necho ${AGENT_SENTINEL}\n`);
       });
     },
   }));
