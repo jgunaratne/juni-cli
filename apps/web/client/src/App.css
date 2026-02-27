@@ -116,11 +116,14 @@
 }
 
 .split-btn-group__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   color: var(--text-secondary);
   border: none;
   padding: 0 10px;
-    height: 28px;
+  height: 28px;
   font-family: 'Inter', sans-serif;
   font-size: 12px;
   cursor: pointer;
@@ -675,6 +678,9 @@
   color: var(--text-muted);
 }
 .settings-reset-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   height: 32px;
   padding: 0 10px;
   background: rgba(255, 255, 255, 0.06);
@@ -682,8 +688,8 @@
   border-radius: 6px;
   color: var(--text-secondary);
   font-family: 'Inter', sans-serif;
-    font-size: 12px;
-    font-weight: 500;
+  font-size: 12px;
+  font-weight: 500;
   cursor: pointer;
   transition: background 0.2s, color 0.2s;
   white-space: nowrap;
@@ -1130,8 +1136,9 @@
 .disconnect-btn {
   height: 28px;
   padding: 0 12px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   background: transparent;
   border: 1px solid rgba(255, 123, 114, 0.3);
@@ -1839,6 +1846,9 @@
 }
 
 .agent-question-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   height: 32px;
   padding: 0 14px;
   background: rgba(188, 140, 255, 0.15);
@@ -1894,6 +1904,9 @@
 }
 
 .agent-approve-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   height: 28px;
   padding: 0 14px;
   background: rgba(86, 211, 100, 0.12);
@@ -1913,6 +1926,9 @@
 }
 
 .agent-skip-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   height: 28px;
   padding: 0 14px;
   background: rgba(255, 123, 114, 0.1);
