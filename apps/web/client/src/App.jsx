@@ -28,6 +28,15 @@ const MONO_FONTS = [
 ];
 
 const SETTINGS_KEY = 'juni-cli:settings';
+const TABS_KEY = 'juni-cli:tabs';
+
+function loadTabs() {
+  try {
+    const data = JSON.parse(localStorage.getItem(TABS_KEY));
+    if (data && Array.isArray(data.tabs)) return data;
+  } catch { /* ignore */ }
+  return null;
+}
 
 function loadSettings() {
   try {
@@ -48,9 +57,28 @@ function loadGoogleFont(fontName) {
 }
 
 function App() {
-  const [tabs, setTabs] = useState([]);           // { id, type, connection?, status }
-  const [activeTab, setActiveTab] = useState(null); // id or null
-  const [showForm, setShowForm] = useState(true);
+  const [tabs, setTabs] = useState(() => {
+    const saved = loadTabs();
+    if (saved && saved.tabs.length > 0) {
+      const restored = saved.tabs
+        .filter((t) => t.type === 'ssh' || t.type === 'gemini')
+        .map((t) => ({ ...t, status: 'connecting' }));
+      if (restored.length > 0) {
+        const maxId = Math.max(...restored.map((t) => t.id));
+        if (maxId >= nextId) nextId = maxId + 1;
+        return restored;
+      }
+    }
+    return [];
+  });
+  const [activeTab, setActiveTab] = useState(() => {
+    const saved = loadTabs();
+    return saved?.activeTab ?? null;
+  });
+  const [showForm, setShowForm] = useState(() => {
+    const saved = loadTabs();
+    return !(saved && saved.tabs.filter((t) => t.type === 'ssh' || t.type === 'gemini').length > 0);
+  });
   const [splitMode, setSplitMode] = useState(() => {
     const s = loadSettings();
     return s.splitMode ?? false;
@@ -106,6 +134,14 @@ function App() {
   useEffect(() => {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify({ fontFamily, fontSize, bgColor, splitMode, splitLayout, sharingEnabled, relayServerAddr }));
   }, [fontFamily, fontSize, bgColor, splitMode, splitLayout, sharingEnabled, relayServerAddr]);
+
+  // Persist tabs to localStorage
+  useEffect(() => {
+    const serializable = tabs
+      .filter((t) => t.type === 'ssh' || t.type === 'gemini')
+      .map(({ id, type, connection, status }) => ({ id, type, connection, status }));
+    localStorage.setItem(TABS_KEY, JSON.stringify({ tabs: serializable, activeTab }));
+  }, [tabs, activeTab]);
 
   useEffect(() => {
     document.documentElement.style.setProperty('--terminal-font', `'${fontFamily}', monospace`);
