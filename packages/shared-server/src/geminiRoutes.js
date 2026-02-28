@@ -30,7 +30,7 @@ function createGeminiRoutes({ defaultProject, defaultLocation }) {
   router.post('/chat', async (req, res) => {
     try {
       const {
-        model = 'gemini-3.1-flash-preview',
+        model = 'gemini-3.1-pro-preview',
         messages = [],
         project,
         location,
@@ -117,7 +117,7 @@ function createGeminiRoutes({ defaultProject, defaultLocation }) {
   router.post('/agent', async (req, res) => {
     try {
       const {
-        model = 'gemini-3.1-flash-preview',
+        model = 'gemini-3.1-pro-preview',
         history = [],
         project,
         location,

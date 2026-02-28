@@ -45,6 +45,6 @@ function getGeminiClient(project, location) {
 }
 
 // Models that use @google/genai via Vertex AI instead of @google-cloud/vertexai
-const GENAI_MODELS = ['gemini-3.1-flash-preview', 'gemini-3.1-pro-preview'];
+const GENAI_MODELS = ['gemini-3.1-flash-preview', 'gemini-3.1-pro-preview', 'gemini-3.1-pro-preview-customtools'];
 
 module.exports = { getVertexClient, getGeminiClient, GENAI_MODELS };

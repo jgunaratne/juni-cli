@@ -88,7 +88,7 @@ function renderForTerminal(text) {
 /* ── Component ────────────────────────────────────────── */
 
 const GeminiChat = forwardRef(function GeminiChat({
-  model = 'gemini-3.1-flash-preview',
+  model = 'gemini-3.1-pro-preview',
   isActive,
   onStatusChange,
   onRunCommand,
