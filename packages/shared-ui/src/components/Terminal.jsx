@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { io } from 'socket.io-client';
@@ -19,6 +19,7 @@ const stripAnsi = (str) => str
 
 const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onStatusChange, onClose, fontFamily, fontSize, bgColor, serverUrl, isSharing, shareCode, viewerCount, onShareStart, onShareStop, onTerminalOutput, onSendToGemini }, ref) {
   const [showSharePanel, setShowSharePanel] = useState(false);
+  const [reconnectCount, setReconnectCount] = useState(0);
   const sharePanelRef = useRef(null);
   const termRef = useRef(null);
   const xtermRef = useRef(null);
@@ -343,7 +344,7 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
       term.dispose();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serverUrl]);
+  }, [serverUrl, reconnectCount]);
 
   useEffect(() => {
     if (!isActive || !fitRef.current || !xtermRef.current) return;
@@ -394,6 +395,29 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
           )}
         </div>
         <div className="toolbar-right">
+          <button
+            className="reconnect-btn"
+            onClick={() => {
+              // Disconnect old socket so the useEffect cleanup runs
+              if (socketRef.current) {
+                socketRef.current.disconnect();
+                socketRef.current = null;
+              }
+              if (xtermRef.current) {
+                xtermRef.current.clear();
+              }
+              onStatusChange('connecting');
+              setReconnectCount((c) => c + 1);
+            }}
+            title="Reconnect SSH session"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="23 4 23 10 17 10" />
+              <polyline points="1 20 1 14 7 14" />
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10" />
+              <path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14" />
+            </svg>
+          </button>
           <div className="share-wrapper" ref={sharePanelRef}>
             <button
               className={`share-btn ${isSharing ? 'share-btn--active' : ''}`}
