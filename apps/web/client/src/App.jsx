@@ -592,7 +592,7 @@ function App() {
     <div className="app">
       <header className="app-header">
         <div className="logo">
-          <span className="logo-icon">⬡</span>
+
           <h1>Juni CLI</h1>
         </div>
         <div className="header-right">

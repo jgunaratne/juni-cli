@@ -634,7 +634,7 @@ function App() {
         {/* macOS drag region */}
         <div className="titlebar-drag-region" />
         <div className="logo">
-          <span className="logo-icon">⬡</span>
+
           <h1>Juni CLI</h1>
         </div>
         <div className="header-right">
