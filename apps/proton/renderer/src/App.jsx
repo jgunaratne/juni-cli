@@ -26,6 +26,15 @@ const MONO_FONTS = [
 ];
 
 const SETTINGS_KEY = 'juni-cli-proton:settings';
+const TABS_KEY = 'juni-cli-proton:tabs';
+
+function loadTabs() {
+  try {
+    const data = JSON.parse(localStorage.getItem(TABS_KEY));
+    if (data && Array.isArray(data.tabs)) return data;
+  } catch { /* ignore */ }
+  return null;
+}
 
 function loadSettings() {
   try {
@@ -46,9 +55,31 @@ function loadGoogleFont(fontName) {
 }
 
 function App() {
-  const [tabs, setTabs] = useState([]);
-  const [activeTab, setActiveTab] = useState(null);
-  const [showForm, setShowForm] = useState(true);
+  const [tabs, setTabs] = useState(() => {
+    const saved = loadTabs();
+    if (saved && saved.tabs.length > 0) {
+      // Restore only ssh and gemini tabs (shared tabs have non-serializable WS refs)
+      const restored = saved.tabs
+        .filter((t) => t.type === 'ssh' || t.type === 'gemini')
+        .map((t) => ({ ...t, status: 'connecting' }));
+      if (restored.length > 0) {
+        // Ensure nextId is higher than any restored tab id
+        const maxId = Math.max(...restored.map((t) => t.id));
+        if (maxId >= nextId) nextId = maxId + 1;
+        return restored;
+      }
+    }
+    return [];
+  });
+  const [activeTab, setActiveTab] = useState(() => {
+    const saved = loadTabs();
+    return saved?.activeTab ?? null;
+  });
+  const [showForm, setShowForm] = useState(() => {
+    const saved = loadTabs();
+    // Show form only if there are no restored tabs
+    return !(saved && saved.tabs.filter((t) => t.type === 'ssh' || t.type === 'gemini').length > 0);
+  });
   const [splitMode, setSplitMode] = useState(() => {
     const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
     return s.splitMode ?? false;
@@ -118,6 +149,14 @@ function App() {
   useEffect(() => {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify({ fontFamily, fontSize, bgColor, splitMode, splitLayout, sharingEnabled, relayServerAddr }));
   }, [fontFamily, fontSize, bgColor, splitMode, splitLayout, sharingEnabled, relayServerAddr]);
+
+  // Persist tabs to localStorage
+  useEffect(() => {
+    const serializable = tabs
+      .filter((t) => t.type === 'ssh' || t.type === 'gemini')
+      .map(({ id, type, connection, status }) => ({ id, type, connection, status }));
+    localStorage.setItem(TABS_KEY, JSON.stringify({ tabs: serializable, activeTab }));
+  }, [tabs, activeTab]);
 
   useEffect(() => {
     document.documentElement.style.setProperty('--terminal-font', `'${fontFamily}', monospace`);
