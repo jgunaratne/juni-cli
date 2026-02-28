@@ -146,13 +146,15 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
           if (agentCaptureRef.current) {
             const raw = stripAnsi(agentCaptureRef.current.buffer).trim();
             agentCaptureRef.current = null;
-            resolve(raw || '(command timed out after 60s — it may be waiting for input)');
+            resolve(raw || '(command timed out after 20s — it may be waiting for input)');
           }
-        }, 60000);
+        }, 20000);
         agentCaptureRef.current = { buffer: '', resolve, timer };
+        // Prefix with PAGER=cat so git log, man, etc. don't open pagers that trap the agent.
         // Send the command with sentinel on a NEW LINE so heredocs & multi-line
         // commands finish before the sentinel echo runs.
-        socketRef.current.emit('ssh:data', `${command}\necho ${AGENT_SENTINEL}\n`);
+        const wrappedCmd = `PAGER=cat ${command}`;
+        socketRef.current.emit('ssh:data', `${wrappedCmd}\necho ${AGENT_SENTINEL}\n`);
       });
     },
   }));

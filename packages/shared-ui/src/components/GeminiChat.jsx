@@ -237,11 +237,25 @@ const GeminiChat = forwardRef(function GeminiChat({
     ));
 
     if (timedOut) {
+      // Auto-recover: try to escape whatever is stuck
       setMessages((prev) => [...prev, {
         type: 'system',
-        text: 'Command may be waiting for input. Check the terminal and resolve it, then try again.',
+        text: 'Command timed out — auto-recovering (sending Ctrl+C, exiting pagers)…',
       }]);
-      abortAgentRef.current = true;
+      if (onSendAgentKeys) {
+        await onSendAgentKeys('Ctrl+C');
+        await new Promise((r) => setTimeout(r, 500));
+        await onSendAgentKeys('Ctrl+C');
+        await new Promise((r) => setTimeout(r, 500));
+        await onSendAgentKeys('q Enter');
+        await new Promise((r) => setTimeout(r, 300));
+      }
+      // Read terminal after recovery so the model sees the current state
+      let recoveryState = '';
+      if (onReadTerminal) {
+        recoveryState = '\n[Terminal state after recovery]:\n' + smartTruncate(onReadTerminal());
+      }
+      output += recoveryState;
     }
 
     const truncatedOutput = smartTruncate(output);
@@ -255,7 +269,7 @@ const GeminiChat = forwardRef(function GeminiChat({
     };
 
     return [...currentHistory, modelEntry, functionResponseEntry];
-  }, [onRunAgentCommand]);
+  }, [onRunAgentCommand, onSendAgentKeys, onReadTerminal]);
 
   const executeAgentSendKeys = useCallback(async (keys, reasoning, currentHistory, originalParts) => {
     setAgentSteps((prev) => [...prev, {
@@ -270,6 +284,15 @@ const GeminiChat = forwardRef(function GeminiChat({
       output = await onSendAgentKeys(keys);
     } else {
       output = '(No terminal connected for sending keys)';
+    }
+
+    // Auto follow-up: read full terminal buffer after send_keys for better context.
+    // send_keys only captures ~3s of output which is often insufficient.
+    if (onReadTerminal) {
+      const terminalContent = onReadTerminal();
+      if (terminalContent) {
+        output += '\n[Full terminal buffer]:\n' + smartTruncate(terminalContent);
+      }
     }
 
     const displayOutput = smartTruncate(output);
@@ -291,7 +314,7 @@ const GeminiChat = forwardRef(function GeminiChat({
     };
 
     return [...currentHistory, modelEntry, functionResponseEntry];
-  }, [onSendAgentKeys]);
+  }, [onSendAgentKeys, onReadTerminal]);
 
   const requestApproval = useCallback((type, detail, reasoning) => {
     return new Promise((resolve) => {
