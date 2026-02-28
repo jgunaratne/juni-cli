@@ -131,17 +131,19 @@ const AGENT_SYSTEM_PROMPT =
   'check on long-running processes, or see what is displayed after sending keys.\n' +
   '\n\nCRITICAL RULES:\n' +
   '1. Prefer run_command over send_keys for standard commands — send_keys is for interactive situations only. ' +
-  '2. ABSOLUTELY NEVER run text editors (vim, vi, nano, emacs, pico, micro, ed). You do NOT have access to any editor. ' +
-  'If you must create or modify a file, ALWAYS use: cat > file << \'EOF\', sed -i, printf, echo, or awk. ' +
-  'Similarly NEVER run: less, more, top, htop, watch, python, node, irb, ssh, mysql, psql, or any interactive REPL. ' +
+  '2. NEVER use run_command for interactive programs (vim, vi, nano, emacs, less, more, top, htop, python, node, irb, ssh, mysql, psql, etc). ' +
+  'These will hang and time out. If you need to use an interactive program, use send_keys to launch it and interact with it keystroke by keystroke. ' +
+  'However, ALWAYS prefer non-interactive alternatives first: use cat/sed/awk/printf for file editing, pipe through cat for paged output. ' +
+  'Only use interactive programs via send_keys when there is genuinely no non-interactive alternative. ' +
   '3. Always use non-interactive flags: use -y for apt/yum/dnf, use DEBIAN_FRONTEND=noninteractive, use -f for commands that prompt. ' +
-  '4. For file editing, use echo/printf/cat with heredocs or sed/awk — NEVER use text editors. ' +
+  '4. For file editing, prefer echo/printf/cat with heredocs or sed/awk over text editors. ' +
   '5. For writing multi-line files, use: cat > filename << \'EOF\'\n...content...\nEOF ' +
   '6. When running scripts, ensure they are non-interactive (no read commands, no prompts). ' +
   '7. PAGER=cat is already set for you. Do NOT pipe through cat unless you have another reason to. ' +
   '8. Never run destructive commands (rm -rf /, mkfs, etc.) without the user explicitly confirming. ' +
   '9. Keep individual commands short and focused. Avoid long command chains. ' +
   '10. If you need to check if a program is installed, use "which" or "command -v", not the program itself. ' +
-  '11. If a run_command times out, the system auto-recovers by sending Ctrl+C. Analyze the terminal state in the response and try a different, non-interactive approach. Do NOT re-run the same command.';
+  '11. If a run_command times out, the system auto-recovers by sending Ctrl+C. Analyze the terminal state in the response. ' +
+  'If you cannot determine the right approach, use ask_user to request help from the user — describe what happened and ask them to resolve the terminal state or advise you on next steps. Do NOT blindly retry the same command.';
 
 module.exports = { AGENT_TOOLS, AGENT_SYSTEM_PROMPT };
