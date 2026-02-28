@@ -110,6 +110,10 @@ function App() {
     const s = loadSettings();
     return s.relayServerAddr || '';
   });
+  const [shareNeverExpire, setShareNeverExpire] = useState(() => {
+    const s = loadSettings();
+    return s.shareNeverExpire ?? false;
+  });
   const [sharingState, setSharingState] = useState({});  // { [tabId]: { active, code, ws, viewerCount } }
   const [showConnectDialog, setShowConnectDialog] = useState(false);
   const [connectCode, setConnectCode] = useState('');
@@ -132,8 +136,8 @@ function App() {
   }, [fontFamily]);
 
   useEffect(() => {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ fontFamily, fontSize, bgColor, splitMode, splitLayout, sharingEnabled, relayServerAddr }));
-  }, [fontFamily, fontSize, bgColor, splitMode, splitLayout, sharingEnabled, relayServerAddr]);
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ fontFamily, fontSize, bgColor, splitMode, splitLayout, sharingEnabled, relayServerAddr, shareNeverExpire }));
+  }, [fontFamily, fontSize, bgColor, splitMode, splitLayout, sharingEnabled, relayServerAddr, shareNeverExpire]);
 
   // Persist tabs to localStorage
   useEffect(() => {
@@ -222,7 +226,8 @@ function App() {
 
   // ── Start sharing a terminal ──────────────────────
   const handleStartSharing = useCallback((tabId) => {
-    const wsUrl = getRelayWsUrl() + '?role=host';
+    const ttl = shareNeverExpire ? 'never' : '3600000';
+    const wsUrl = getRelayWsUrl() + `?role=host&ttl=${ttl}`;
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
@@ -720,6 +725,14 @@ function App() {
                       onChange={(e) => setSharingEnabled(e.target.checked)}
                     />
                     <span className="auto-execute-label">Enable sharing relay</span>
+                  </label>
+                  <label className="auto-execute-toggle" style={{ marginTop: '6px' }}>
+                    <input
+                      type="checkbox"
+                      checked={shareNeverExpire}
+                      onChange={(e) => setShareNeverExpire(e.target.checked)}
+                    />
+                    <span className="auto-execute-label">Share tokens never expire</span>
                   </label>
                 </div>
                 <div className="settings-group">

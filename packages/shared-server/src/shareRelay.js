@@ -3,13 +3,14 @@ const crypto = require('crypto');
 const url = require('url');
 
 const MAX_SESSIONS = 10;
-const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const DEFAULT_TTL_MS = 60 * 60 * 1000; // 1 hour
+const MAX_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours cap
 
 /**
  * Attach a WebSocket relay server to the given HTTP server
  * for terminal sharing sessions.
  *
- * Host flow:   ws://server/share?role=host
+ * Host flow:   ws://server/share?role=host[&ttl=never|ms]
  * Viewer flow: ws://server/share?role=viewer&code=XXXXXXXX
  */
 function setupShareRelay(server) {
@@ -31,7 +32,8 @@ function setupShareRelay(server) {
     const role = params.get('role');
 
     if (role === 'host') {
-      handleHost(ws, sessions);
+      const ttlParam = params.get('ttl');
+      handleHost(ws, sessions, ttlParam);
     } else if (role === 'viewer') {
       const code = params.get('code');
       handleViewer(ws, code, sessions);
@@ -47,7 +49,7 @@ function generateShareCode() {
   return crypto.randomBytes(12).toString('base64url'); // 16 URL-safe chars, 96 bits entropy
 }
 
-function handleHost(ws, sessions) {
+function handleHost(ws, sessions, ttlParam) {
   if (sessions.size >= MAX_SESSIONS) {
     ws.send(JSON.stringify({ type: 'error', data: 'Maximum active sessions reached' }));
     ws.close(4001, 'Max sessions');
@@ -55,15 +57,20 @@ function handleHost(ws, sessions) {
   }
 
   const code = generateShareCode();
+
+  // Determine TTL: 'never' disables expiration, otherwise use provided ms (capped at 24h)
+  const neverExpire = ttlParam === 'never';
+  const ttlMs = neverExpire ? null : Math.min(parseInt(ttlParam, 10) || DEFAULT_TTL_MS, MAX_TTL_MS);
+
   const session = {
     host: ws,
     viewers: new Set(),
     createdAt: Date.now(),
-    expireTimer: setTimeout(() => {
+    expireTimer: neverExpire ? null : setTimeout(() => {
       console.log(`[share-relay] session ${code} expired`);
-      ws.send(JSON.stringify({ type: 'expired', data: 'Session expired after 30 minutes' }));
+      ws.send(JSON.stringify({ type: 'expired', data: `Session expired after ${Math.round(ttlMs / 60000)} minutes` }));
       cleanupSession(code, sessions);
-    }, SESSION_TTL_MS),
+    }, ttlMs),
   };
 
   sessions.set(code, session);
