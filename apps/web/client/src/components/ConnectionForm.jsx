@@ -141,13 +141,29 @@ export default function ConnectionForm({ onConnect }) {
         </div>
 
         {/* ── Protocol Toggle ──────────────────────── */}
-        <div className="protocol-toggle">
+        <div style={{ display: 'flex', gap: '6px', marginBottom: '28px' }}>
           <button
             type="button"
-            className={`protocol-option ${protocol === 'ssh' ? 'protocol-option--active' : ''}`}
             onClick={() => handleProtocolChange('ssh')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              height: '28px',
+              padding: '0 12px',
+              background: protocol === 'ssh' ? 'rgba(88, 166, 255, 0.12)' : 'rgba(255, 255, 255, 0.04)',
+              border: `1px solid ${protocol === 'ssh' ? 'rgba(88, 166, 255, 0.5)' : 'rgba(48, 54, 61, 0.6)'}`,
+              borderRadius: '6px',
+              color: protocol === 'ssh' ? '#58a6ff' : '#484f58',
+              fontFamily: "'Inter', sans-serif",
+              fontSize: '12px',
+              fontWeight: 500,
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              boxShadow: protocol === 'ssh' ? '0 0 12px rgba(88, 166, 255, 0.15)' : 'none',
+            }}
           >
-            <svg className="protocol-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block', flexShrink: 0 }}>
               <polyline points="4 17 10 11 4 5" />
               <line x1="12" y1="19" x2="20" y2="19" />
             </svg>
@@ -155,10 +171,26 @@ export default function ConnectionForm({ onConnect }) {
           </button>
           <button
             type="button"
-            className={`protocol-option ${protocol === 'vnc' ? 'protocol-option--active protocol-option--vnc' : ''}`}
             onClick={() => handleProtocolChange('vnc')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              height: '28px',
+              padding: '0 12px',
+              background: protocol === 'vnc' ? 'rgba(45, 212, 191, 0.12)' : 'rgba(255, 255, 255, 0.04)',
+              border: `1px solid ${protocol === 'vnc' ? 'rgba(45, 212, 191, 0.5)' : 'rgba(48, 54, 61, 0.6)'}`,
+              borderRadius: '6px',
+              color: protocol === 'vnc' ? '#2dd4bf' : '#484f58',
+              fontFamily: "'Inter', sans-serif",
+              fontSize: '12px',
+              fontWeight: 500,
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              boxShadow: protocol === 'vnc' ? '0 0 12px rgba(45, 212, 191, 0.15)' : 'none',
+            }}
           >
-            <svg className="protocol-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block', flexShrink: 0 }}>
               <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
               <line x1="8" y1="21" x2="16" y2="21" />
               <line x1="12" y1="17" x2="12" y2="21" />

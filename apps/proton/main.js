@@ -266,7 +266,14 @@ function startServer() {
     const net = require('net');
     const { WebSocketServer } = require('ws');
 
-    const vncWss = new WebSocketServer({ noServer: true });
+    // Accept the 'binary' sub-protocol that noVNC requests
+    const vncWss = new WebSocketServer({
+      noServer: true,
+      handleProtocols: (protocols) => {
+        if (protocols.has('binary')) return 'binary';
+        return false;
+      },
+    });
 
     server.on('upgrade', (request, socket, head) => {
       const url = new URL(request.url, `http://${request.headers.host}`);
@@ -283,7 +290,9 @@ function startServer() {
       }
 
       vncWss.handleUpgrade(request, socket, head, (ws) => {
-        console.log(`[vnc-proxy] connecting to ${targetHost}:${targetPort}`);
+        ws.binaryType = 'nodebuffer';
+
+        console.log(`[vnc-proxy] WebSocket connected, opening TCP to ${targetHost}:${targetPort}`);
 
         const tcpSocket = net.createConnection({ host: targetHost, port: targetPort }, () => {
           console.log(`[vnc-proxy] TCP connected to ${targetHost}:${targetPort}`);
@@ -291,23 +300,27 @@ function startServer() {
 
         tcpSocket.on('data', (data) => {
           if (ws.readyState === 1) { // WebSocket.OPEN
-            ws.send(data);
+            try {
+              ws.send(data);
+            } catch (err) {
+              console.error(`[vnc-proxy] ws.send error: ${err.message}`);
+            }
           }
         });
 
         tcpSocket.on('error', (err) => {
           console.error(`[vnc-proxy] TCP error: ${err.message}`);
-          ws.close(1011, err.message);
+          if (ws.readyState === 1) ws.close(1011, err.message);
         });
 
         tcpSocket.on('close', () => {
           console.log('[vnc-proxy] TCP connection closed');
-          ws.close();
+          if (ws.readyState === 1) ws.close();
         });
 
         ws.on('message', (data) => {
           if (tcpSocket.writable) {
-            tcpSocket.write(Buffer.from(data));
+            tcpSocket.write(data);
           }
         });
 
