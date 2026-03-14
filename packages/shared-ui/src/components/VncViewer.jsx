@@ -53,7 +53,7 @@ export default function VncViewer({ tabId, connection, isActive, onStatusChange,
       rfb.background = '#0d1117';
       rfb.qualityLevel = 6;       // 0-9: lower = faster, more artifacts
       rfb.compressionLevel = 2;   // 0-9: higher = more CPU, less bandwidth
-      rfb.showDotCursor = true;   // lightweight cursor rendering
+      rfb.showDotCursor = true;   // show dot when remote cursor is hidden
 
       rfb.addEventListener('connect', () => {
         if (!disposed) onStatusChangeRef.current('ready');
