@@ -1055,7 +1055,7 @@
 .protocol-toggle {
   display: flex;
   gap: 0;
-  margin-bottom: 22px;
+  margin-bottom: 28px;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -1064,13 +1064,13 @@
 
 .protocol-option {
   flex: 1;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 7px;
-  padding: 8px 16px;
+  padding: 9px 16px;
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
   border-radius: calc(var(--radius-sm) - 2px);
   color: var(--text-muted);
   font-family: 'Inter', sans-serif;
@@ -1079,6 +1079,7 @@
   letter-spacing: 0.04em;
   cursor: pointer;
   transition: all 0.15s ease;
+  line-height: 1;
 }
 
 .protocol-option:hover {
@@ -1089,7 +1090,7 @@
 .protocol-option--active {
   background: var(--bg-tertiary);
   color: var(--accent);
-  border: 1px solid var(--border);
+  border-color: var(--border);
 }
 
 .protocol-option--active:hover {
@@ -1106,6 +1107,7 @@
 
 .protocol-icon {
   flex-shrink: 0;
+  display: block;
 }
 
 /* ── VNC Tab Accent ───────────────────────────── */
