@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { ConnectionForm, Terminal, SharedTerminal, GeminiChat } from '@juni/shared-ui';
+import { ConnectionForm, Terminal, SharedTerminal, GeminiChat, VncViewer } from '@juni/shared-ui';
 
 import './App.css';
 
@@ -61,7 +61,7 @@ function App() {
     const saved = loadTabs();
     if (saved && saved.tabs.length > 0) {
       const restored = saved.tabs
-        .filter((t) => t.type === 'ssh' || t.type === 'gemini')
+        .filter((t) => t.type === 'ssh' || t.type === 'gemini' || t.type === 'vnc')
         .map((t) => ({ ...t, status: 'connecting' }));
       if (restored.length > 0) {
         const maxId = Math.max(...restored.map((t) => t.id));
@@ -77,7 +77,7 @@ function App() {
   });
   const [showForm, setShowForm] = useState(() => {
     const saved = loadTabs();
-    return !(saved && saved.tabs.filter((t) => t.type === 'ssh' || t.type === 'gemini').length > 0);
+    return !(saved && saved.tabs.filter((t) => t.type === 'ssh' || t.type === 'gemini' || t.type === 'vnc').length > 0);
   });
   const [splitMode, setSplitMode] = useState(() => {
     const s = loadSettings();
@@ -142,7 +142,7 @@ function App() {
   // Persist tabs to localStorage
   useEffect(() => {
     const serializable = tabs
-      .filter((t) => t.type === 'ssh' || t.type === 'gemini')
+      .filter((t) => t.type === 'ssh' || t.type === 'gemini' || t.type === 'vnc')
       .map(({ id, type, connection, status }) => ({ id, type, connection, status }));
     localStorage.setItem(TABS_KEY, JSON.stringify({ tabs: serializable, activeTab }));
   }, [tabs, activeTab]);
@@ -458,7 +458,8 @@ function App() {
 
   const handleConnect = useCallback((credentials) => {
     const id = nextId++;
-    const newTab = { id, type: 'ssh', connection: credentials, status: 'connecting' };
+    const tabType = credentials.protocol === 'vnc' ? 'vnc' : 'ssh';
+    const newTab = { id, type: tabType, connection: credentials, status: 'connecting' };
     setTabs((prev) => [...prev, newTab]);
     setActiveTab(id);
     setShowForm(false);
@@ -576,6 +577,7 @@ function App() {
   const getTabLabel = (tab) => {
     if (tab.type === 'gemini') return 'Gemini';
     if (tab.type === 'shared') return `Shared (${tab.shareCode?.substring(0, 6)}…)`;
+    if (tab.type === 'vnc') return `VNC ${tab.connection.host}`;
     return `${tab.connection.username}@${tab.connection.host}`;
   };
 
@@ -761,7 +763,7 @@ function App() {
           {tabs.map((tab) => (
             <div
               key={tab.id}
-              className={`tab ${tab.id === activeTab && !showForm ? 'active' : ''} ${tab.type === 'gemini' ? 'tab--gemini' : ''} ${tab.type === 'shared' ? 'tab--shared' : ''} ${sharingState[tab.id]?.active ? 'tab--sharing' : ''}`}
+              className={`tab ${tab.id === activeTab && !showForm ? 'active' : ''} ${tab.type === 'gemini' ? 'tab--gemini' : ''} ${tab.type === 'vnc' ? 'tab--vnc' : ''} ${tab.type === 'shared' ? 'tab--shared' : ''} ${sharingState[tab.id]?.active ? 'tab--sharing' : ''}`}
               onClick={() => switchTab(tab.id)}
             >
               {tab.type === 'gemini' ? (
@@ -800,7 +802,7 @@ function App() {
       <main className={`app-main ${splitMode ? `app-main--split app-main--split-${splitLayout}` : ''}`} ref={mainRef} style={splitMode ? { '--split-ratio': `${splitRatio}%` } : undefined}>
         {/* Left panel (or full panel when not split) */}
         <div className={`split-panel split-panel--left ${splitMode ? '' : 'split-panel--full'}`}>
-          {showForm && <ConnectionForm onConnect={handleConnect} />}
+          {showForm && <ConnectionForm onConnect={handleConnect} serverUrl={SERVER_URL} />}
 
           {tabs.map((tab) =>
             tab.type === 'ssh' ? (
@@ -860,6 +862,16 @@ function App() {
                     onSendToTerminal={splitMode ? sendToTerminal : undefined}
                 />
                 )
+            ) : tab.type === 'vnc' ? (
+              <VncViewer
+                key={tab.id}
+                tabId={tab.id}
+                connection={tab.connection}
+                isActive={tab.id === activeTab && !showForm}
+                onStatusChange={(status) => handleStatusChange(tab.id, status)}
+                onClose={() => handleCloseTab(tab.id)}
+                serverUrl={SERVER_URL}
+              />
             ) : null,
           )}
 
