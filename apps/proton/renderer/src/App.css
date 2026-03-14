@@ -1054,55 +1054,55 @@
 /* ── Protocol Toggle ──────────────────────────── */
 .protocol-toggle {
   display: flex;
-  gap: 0;
+  gap: 6px;
   margin-bottom: 28px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 3px;
 }
 
 .protocol-option {
-  flex: 1;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 7px;
-  padding: 9px 16px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: calc(var(--radius-sm) - 2px);
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 6px;
   color: var(--text-muted);
   font-family: 'Inter', sans-serif;
   font-size: 12px;
   font-weight: 500;
-  letter-spacing: 0.04em;
   cursor: pointer;
-  transition: all 0.15s ease;
-  line-height: 1;
+  transition: all 0.2s;
 }
 
 .protocol-option:hover {
   color: var(--text-secondary);
-  background: var(--bg-tertiary);
+  border-color: rgba(139, 148, 158, 0.4);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .protocol-option--active {
-  background: var(--bg-tertiary);
   color: var(--accent);
-  border-color: var(--border);
+  border-color: rgba(88, 166, 255, 0.5);
+  background: rgba(88, 166, 255, 0.12);
+  box-shadow: 0 0 12px rgba(88, 166, 255, 0.15);
 }
 
 .protocol-option--active:hover {
-  color: var(--accent-hover);
+  border-color: rgba(88, 166, 255, 0.7);
+  background: rgba(88, 166, 255, 0.18);
 }
 
 .protocol-option--vnc.protocol-option--active {
   color: #2dd4bf;
+  border-color: rgba(45, 212, 191, 0.5);
+  background: rgba(45, 212, 191, 0.12);
+  box-shadow: 0 0 12px rgba(45, 212, 191, 0.15);
 }
 
 .protocol-option--vnc.protocol-option--active:hover {
-  color: #5eead4;
+  border-color: rgba(45, 212, 191, 0.7);
+  background: rgba(45, 212, 191, 0.18);
 }
 
 .protocol-icon {
