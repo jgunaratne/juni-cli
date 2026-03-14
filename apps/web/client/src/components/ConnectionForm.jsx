@@ -124,12 +124,9 @@ export default function ConnectionForm({ onConnect }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!host) return;
-    if (protocol === 'ssh' && !username) return;
+    if (!username && protocol === 'ssh') return;
 
-    const credentials = { protocol, host, port: Number(port), password };
-    if (protocol === 'ssh') {
-      credentials.username = username;
-    }
+    const credentials = { protocol, host, port: Number(port), username, password };
     saveToHistory({ ...credentials, savePassword });
     onConnect(credentials);
   };
@@ -241,19 +238,17 @@ export default function ConnectionForm({ onConnect }) {
             />
           </div>
 
-          {protocol === 'ssh' && (
-            <div className="form-group">
-              <label htmlFor="username">Username</label>
-              <input
-                id="username"
-                type="text"
-                placeholder="root"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-              />
-            </div>
-          )}
+          <div className="form-group">
+            <label htmlFor="username">Username</label>
+            <input
+              id="username"
+              type="text"
+              placeholder={protocol === 'vnc' ? '(optional)' : 'root'}
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              required={protocol === 'ssh'}
+            />
+          </div>
 
           <div className="form-group">
             <label htmlFor="password">Password</label>

@@ -25,7 +25,7 @@ export default function VncViewer({ tabId, connection, isActive, onStatusChange,
     let rfb = null;
     let disposed = false;
 
-    const { host, port, password } = connection;
+    const { host, port, password, username } = connection;
 
     // Build the proxy WebSocket URL
     const serverBase = serverUrl.replace(/^http/, 'ws');
@@ -34,8 +34,11 @@ export default function VncViewer({ tabId, connection, isActive, onStatusChange,
     onStatusChange('connecting');
 
     try {
+      const creds = { password: password || '' };
+      if (username) creds.username = username;
+
       rfb = new RFB(containerRef.current, wsUrl, {
-        credentials: { password: password || '' },
+        credentials: creds,
         wsProtocols: ['binary'],
       });
 
@@ -65,8 +68,11 @@ export default function VncViewer({ tabId, connection, isActive, onStatusChange,
       });
 
       rfb.addEventListener('credentialsrequired', () => {
-        if (password) {
-          rfb.sendCredentials({ password });
+        const creds = {};
+        if (username) creds.username = username;
+        if (password) creds.password = password;
+        if (Object.keys(creds).length) {
+          rfb.sendCredentials(creds);
         }
       });
     } catch (err) {

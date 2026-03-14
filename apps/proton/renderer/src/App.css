@@ -1052,13 +1052,13 @@
 }
 
 /* ── Protocol Toggle ──────────────────────────── */
-.protocol-toggle {
+.connection-form .protocol-toggle {
   display: flex;
   gap: 6px;
   margin-bottom: 28px;
 }
 
-.protocol-option {
+.connection-form .protocol-option {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1075,37 +1075,37 @@
   transition: all 0.2s;
 }
 
-.protocol-option:hover {
+.connection-form .protocol-option:hover {
   color: var(--text-secondary);
   border-color: rgba(139, 148, 158, 0.4);
   background: rgba(255, 255, 255, 0.06);
 }
 
-.protocol-option--active {
+.connection-form .protocol-option--active {
   color: var(--accent);
   border-color: rgba(88, 166, 255, 0.5);
   background: rgba(88, 166, 255, 0.12);
   box-shadow: 0 0 12px rgba(88, 166, 255, 0.15);
 }
 
-.protocol-option--active:hover {
+.connection-form .protocol-option--active:hover {
   border-color: rgba(88, 166, 255, 0.7);
   background: rgba(88, 166, 255, 0.18);
 }
 
-.protocol-option--vnc.protocol-option--active {
+.connection-form .protocol-option--vnc.protocol-option--active {
   color: #2dd4bf;
   border-color: rgba(45, 212, 191, 0.5);
   background: rgba(45, 212, 191, 0.12);
   box-shadow: 0 0 12px rgba(45, 212, 191, 0.15);
 }
 
-.protocol-option--vnc.protocol-option--active:hover {
+.connection-form .protocol-option--vnc.protocol-option--active:hover {
   border-color: rgba(45, 212, 191, 0.7);
   background: rgba(45, 212, 191, 0.18);
 }
 
-.protocol-icon {
+.connection-form .protocol-icon {
   flex-shrink: 0;
   display: block;
 }
