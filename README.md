@@ -109,13 +109,34 @@ npm install
 # Build the client bundle
 cd apps/web/client
 npm run build
-
-# Start the production server
-cd ../
-NODE_ENV=production node server/index.js
 ```
 
-The server runs on port `3001` by default. See [apps/web/DEPLOY.md](apps/web/DEPLOY.md) for Nginx + systemd setup.
+#### Start with PM2
+
+```bash
+sudo npm install -g pm2
+
+# Start from the REPO ROOT so workspace modules resolve correctly
+cd ~/juni-cli
+pm2 start apps/web/server/index.js --name juni-cli
+
+# Auto-start on reboot
+pm2 save
+pm2 startup   # follow the printed command
+```
+
+#### Update a running deployment
+
+```bash
+cd ~/juni-cli
+git pull
+npm install                            # update workspace deps
+cd apps/web/client && npm run build    # rebuild frontend
+cd ~/juni-cli
+pm2 restart juni-cli                   # restart backend
+```
+
+The server runs on port `3001` by default. See [apps/web/DEPLOY.md](apps/web/DEPLOY.md) for Nginx + HTTPS setup.
 
 ### Proton Desktop App (macOS)
 
