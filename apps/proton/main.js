@@ -261,6 +261,68 @@ function startServer() {
       });
     });
 
+    /* ── VNC WebSocket-to-TCP Proxy ─────────────────── */
+
+    const net = require('net');
+    const { WebSocketServer } = require('ws');
+
+    const vncWss = new WebSocketServer({ noServer: true });
+
+    server.on('upgrade', (request, socket, head) => {
+      const url = new URL(request.url, `http://${request.headers.host}`);
+
+      // Only handle /vnc-proxy upgrades; let Socket.io handle its own upgrades
+      if (url.pathname !== '/vnc-proxy') return;
+
+      const targetHost = url.searchParams.get('host');
+      const targetPort = Number(url.searchParams.get('port')) || 5900;
+
+      if (!targetHost) {
+        socket.destroy();
+        return;
+      }
+
+      vncWss.handleUpgrade(request, socket, head, (ws) => {
+        console.log(`[vnc-proxy] connecting to ${targetHost}:${targetPort}`);
+
+        const tcpSocket = net.createConnection({ host: targetHost, port: targetPort }, () => {
+          console.log(`[vnc-proxy] TCP connected to ${targetHost}:${targetPort}`);
+        });
+
+        tcpSocket.on('data', (data) => {
+          if (ws.readyState === 1) { // WebSocket.OPEN
+            ws.send(data);
+          }
+        });
+
+        tcpSocket.on('error', (err) => {
+          console.error(`[vnc-proxy] TCP error: ${err.message}`);
+          ws.close(1011, err.message);
+        });
+
+        tcpSocket.on('close', () => {
+          console.log('[vnc-proxy] TCP connection closed');
+          ws.close();
+        });
+
+        ws.on('message', (data) => {
+          if (tcpSocket.writable) {
+            tcpSocket.write(Buffer.from(data));
+          }
+        });
+
+        ws.on('close', () => {
+          console.log('[vnc-proxy] WebSocket closed');
+          tcpSocket.destroy();
+        });
+
+        ws.on('error', (err) => {
+          console.error(`[vnc-proxy] WebSocket error: ${err.message}`);
+          tcpSocket.destroy();
+        });
+      });
+    });
+
     /* ── Start server ──────────────────────────────────── */
 
     server.listen(0, '127.0.0.1', () => {

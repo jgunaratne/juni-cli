@@ -11,13 +11,14 @@ function loadHistory() {
   }
 }
 
-function saveToHistory({ host, port, username, password, savePassword }) {
+function saveToHistory({ protocol, host, port, username, password, savePassword }) {
   const history = loadHistory();
-  const key = `${host}:${port}:${username}`;
+  const proto = protocol || 'ssh';
+  const key = `${proto}:${host}:${port}:${username || ''}`;
   const filtered = history.filter(
-    (h) => `${h.host}:${h.port}:${h.username}` !== key,
+    (h) => `${h.protocol || 'ssh'}:${h.host}:${h.port}:${h.username || ''}` !== key,
   );
-  const entry = { host, port, username, lastUsed: Date.now() };
+  const entry = { protocol: proto, host, port, username: username || '', lastUsed: Date.now() };
   if (savePassword && password) {
     entry.savedPassword = btoa(password);
   }
@@ -31,6 +32,7 @@ function saveToHistory({ host, port, username, password, savePassword }) {
 export { saveToHistory };
 
 export default function ConnectionForm({ onConnect }) {
+  const [protocol, setProtocol] = useState('ssh');
   const [host, setHost] = useState('');
   const [port, setPort] = useState('22');
   const [username, setUsername] = useState('');
@@ -46,17 +48,27 @@ export default function ConnectionForm({ onConnect }) {
     setHistory(loadHistory());
   }, []);
 
+  const handleProtocolChange = (newProtocol) => {
+    setProtocol(newProtocol);
+    if (newProtocol === 'vnc' && port === '22') {
+      setPort('5900');
+    } else if (newProtocol === 'ssh' && port === '5900') {
+      setPort('22');
+    }
+  };
+
   useEffect(() => {
     if (!host) {
-      setFilteredHistory(history);
+      setFilteredHistory(history.filter((h) => (h.protocol || 'ssh') === protocol));
     } else {
       setFilteredHistory(
         history.filter((h) =>
+          (h.protocol || 'ssh') === protocol &&
           h.host.toLowerCase().includes(host.toLowerCase()),
         ),
       );
     }
-  }, [host, history]);
+  }, [host, history, protocol]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -75,9 +87,10 @@ export default function ConnectionForm({ onConnect }) {
   }, []);
 
   const selectHistory = (entry) => {
+    setProtocol(entry.protocol || 'ssh');
     setHost(entry.host);
     setPort(String(entry.port));
-    setUsername(entry.username);
+    setUsername(entry.username || '');
     if (entry.savedPassword) {
       try {
         setPassword(atob(entry.savedPassword));
@@ -100,9 +113,9 @@ export default function ConnectionForm({ onConnect }) {
 
   const removeHistory = (e, entry) => {
     e.stopPropagation();
-    const key = `${entry.host}:${entry.port}:${entry.username}`;
+    const key = `${entry.protocol || 'ssh'}:${entry.host}:${entry.port}:${entry.username || ''}`;
     const updated = history.filter(
-      (h) => `${h.host}:${h.port}:${h.username}` !== key,
+      (h) => `${h.protocol || 'ssh'}:${h.host}:${h.port}:${h.username || ''}` !== key,
     );
     localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
     setHistory(updated);
@@ -110,8 +123,13 @@ export default function ConnectionForm({ onConnect }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!host || !username) return;
-    const credentials = { host, port: Number(port), username, password };
+    if (!host) return;
+    if (protocol === 'ssh' && !username) return;
+
+    const credentials = { protocol, host, port: Number(port), password };
+    if (protocol === 'ssh') {
+      credentials.username = username;
+    }
     saveToHistory({ ...credentials, savePassword });
     onConnect(credentials);
   };
@@ -120,9 +138,29 @@ export default function ConnectionForm({ onConnect }) {
     <div className="connection-form-wrapper">
       <form className="connection-form" onSubmit={handleSubmit}>
         <div className="form-header">
-          <span className="form-icon">🔐</span>
-          <h2>SSH Connection</h2>
+          <span className="form-icon">{protocol === 'vnc' ? '🖥' : '🔐'}</span>
+          <h2>{protocol === 'vnc' ? 'VNC Connection' : 'SSH Connection'}</h2>
           <p className="form-subtitle">Connect to a remote server</p>
+        </div>
+
+        {/* ── Protocol Toggle ──────────────────────── */}
+        <div className="protocol-toggle">
+          <button
+            type="button"
+            className={`protocol-option ${protocol === 'ssh' ? 'protocol-option--active' : ''}`}
+            onClick={() => handleProtocolChange('ssh')}
+          >
+            <span className="protocol-icon">⌨</span>
+            SSH
+          </button>
+          <button
+            type="button"
+            className={`protocol-option ${protocol === 'vnc' ? 'protocol-option--active protocol-option--vnc' : ''}`}
+            onClick={() => handleProtocolChange('vnc')}
+          >
+            <span className="protocol-icon">🖥</span>
+            VNC
+          </button>
         </div>
 
         <div className="form-grid">
@@ -156,13 +194,16 @@ export default function ConnectionForm({ onConnect }) {
                 <ul className="host-dropdown" ref={dropdownRef}>
                   {filteredHistory.map((entry) => (
                     <li
-                      key={`${entry.host}:${entry.port}:${entry.username}`}
+                      key={`${entry.protocol || 'ssh'}:${entry.host}:${entry.port}:${entry.username || ''}`}
                       onClick={() => selectHistory(entry)}
                     >
                       <div className="history-entry">
                         <span className="history-host">{entry.host}</span>
                         <span className="history-detail">
-                          {entry.username}@:{entry.port}
+                          {entry.protocol === 'vnc'
+                            ? `VNC :${entry.port}`
+                            : `${entry.username}@:${entry.port}`
+                          }
                         </span>
                       </div>
                       <button
@@ -185,7 +226,7 @@ export default function ConnectionForm({ onConnect }) {
             <input
               id="port"
               type="number"
-              placeholder="22"
+              placeholder={protocol === 'vnc' ? '5900' : '22'}
               value={port}
               onChange={(e) => setPort(e.target.value)}
               min="1"
@@ -193,17 +234,19 @@ export default function ConnectionForm({ onConnect }) {
             />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="username">Username</label>
-            <input
-              id="username"
-              type="text"
-              placeholder="root"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-            />
-          </div>
+          {protocol === 'ssh' && (
+            <div className="form-group">
+              <label htmlFor="username">Username</label>
+              <input
+                id="username"
+                type="text"
+                placeholder="root"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+              />
+            </div>
+          )}
 
           <div className="form-group">
             <label htmlFor="password">Password</label>

@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { ConnectionForm, Terminal, SharedTerminal, GeminiChat } from '@juni/shared-ui';
+import { ConnectionForm, Terminal, SharedTerminal, GeminiChat, VncViewer } from '@juni/shared-ui';
 
 import './App.css';
 
@@ -60,7 +60,7 @@ function App() {
     if (saved && saved.tabs.length > 0) {
       // Restore only ssh and gemini tabs (shared tabs have non-serializable WS refs)
       const restored = saved.tabs
-        .filter((t) => t.type === 'ssh' || t.type === 'gemini')
+        .filter((t) => t.type === 'ssh' || t.type === 'gemini' || t.type === 'vnc')
         .map((t) => ({ ...t, status: 'connecting' }));
       if (restored.length > 0) {
         // Ensure nextId is higher than any restored tab id
@@ -78,7 +78,7 @@ function App() {
   const [showForm, setShowForm] = useState(() => {
     const saved = loadTabs();
     // Show form only if there are no restored tabs
-    return !(saved && saved.tabs.filter((t) => t.type === 'ssh' || t.type === 'gemini').length > 0);
+    return !(saved && saved.tabs.filter((t) => t.type === 'ssh' || t.type === 'gemini' || t.type === 'vnc').length > 0);
   });
   const [splitMode, setSplitMode] = useState(() => {
     const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
@@ -157,7 +157,7 @@ function App() {
   // Persist tabs to localStorage
   useEffect(() => {
     const serializable = tabs
-      .filter((t) => t.type === 'ssh' || t.type === 'gemini')
+      .filter((t) => t.type === 'ssh' || t.type === 'gemini' || t.type === 'vnc')
       .map(({ id, type, connection, status }) => ({ id, type, connection, status }));
     localStorage.setItem(TABS_KEY, JSON.stringify({ tabs: serializable, activeTab }));
   }, [tabs, activeTab]);
@@ -461,11 +461,12 @@ function App() {
 
   const handleConnect = useCallback((credentials) => {
     const id = nextId++;
-    const newTab = { id, type: 'ssh', connection: credentials, status: 'connecting' };
+    const tabType = credentials.protocol === 'vnc' ? 'vnc' : 'ssh';
+    const newTab = { id, type: tabType, connection: credentials, status: 'connecting' };
     setTabs((prev) => [...prev, newTab]);
     setActiveTab(id);
     setShowForm(false);
-    lastSshTabId.current = id;
+    if (tabType === 'ssh') lastSshTabId.current = id;
   }, []);
 
   const handleLocalConnect = useCallback(() => {
@@ -607,6 +608,7 @@ function App() {
     if (tab.type === 'gemini') return 'Gemini';
     if (tab.type === 'claude') return 'Claude';
     if (tab.type === 'shared') return `Shared (${tab.shareCode?.substring(0, 6)}…)`;
+    if (tab.type === 'vnc') return `VNC ${tab.connection.host}`;
     if (tab.connection?.local) return 'local';
     return `${tab.connection.username}@${tab.connection.host}`;
   };
@@ -804,7 +806,7 @@ function App() {
           {tabs.map((tab) => (
             <div
               key={tab.id}
-              className={`tab ${tab.id === activeTab && !showForm ? 'active' : ''} ${tab.type === 'gemini' ? 'tab--gemini' : ''} ${tab.type === 'shared' ? 'tab--shared' : ''} ${sharingState[tab.id]?.active ? 'tab--sharing' : ''}`}
+              className={`tab ${tab.id === activeTab && !showForm ? 'active' : ''} ${tab.type === 'gemini' ? 'tab--gemini' : ''} ${tab.type === 'vnc' ? 'tab--vnc' : ''} ${tab.type === 'shared' ? 'tab--shared' : ''} ${sharingState[tab.id]?.active ? 'tab--sharing' : ''}`}
               onClick={() => switchTab(tab.id)}
             >
               {tab.type === 'gemini' ? (
@@ -909,6 +911,16 @@ function App() {
                     serverUrl={serverUrl}
                 />
                 )
+            ) : tab.type === 'vnc' ? (
+              <VncViewer
+                key={tab.id}
+                tabId={tab.id}
+                connection={tab.connection}
+                isActive={tab.id === activeTab && !showForm}
+                onStatusChange={(status) => handleStatusChange(tab.id, status)}
+                onClose={() => handleCloseTab(tab.id)}
+                serverUrl={serverUrl}
+              />
             ) : null,
           )}
 
