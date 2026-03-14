@@ -460,10 +460,8 @@ function App() {
   }, [splitMode, activeTab]);
 
   const handleConnect = useCallback((credentials) => {
-    console.log('[handleConnect] credentials:', JSON.stringify(credentials));
     const id = nextId++;
     const tabType = credentials.protocol === 'vnc' ? 'vnc' : 'ssh';
-    console.log(`[handleConnect] tabType=${tabType}, id=${id}`);
     const newTab = { id, type: tabType, connection: credentials, status: 'connecting' };
     setTabs((prev) => [...prev, newTab]);
     setActiveTab(id);
