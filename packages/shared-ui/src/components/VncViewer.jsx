@@ -19,6 +19,10 @@ export default function VncViewer({ tabId, connection, isActive, onStatusChange,
     setReconnectCount((c) => c + 1);
   }, [onStatusChange]);
 
+  // Use a ref for onStatusChange to avoid re-running the effect when the callback changes
+  const onStatusChangeRef = useRef(onStatusChange);
+  useEffect(() => { onStatusChangeRef.current = onStatusChange; }, [onStatusChange]);
+
   useEffect(() => {
     if (!serverUrl || !connection) return;
 
@@ -31,7 +35,7 @@ export default function VncViewer({ tabId, connection, isActive, onStatusChange,
     const serverBase = serverUrl.replace(/^http/, 'ws');
     const wsUrl = `${serverBase}/vnc-proxy?host=${encodeURIComponent(host)}&port=${encodeURIComponent(port)}`;
 
-    onStatusChange('connecting');
+    onStatusChangeRef.current('connecting');
 
     try {
       const creds = { password: password || '' };
@@ -49,20 +53,20 @@ export default function VncViewer({ tabId, connection, isActive, onStatusChange,
       rfb.background = '#0d1117';
 
       rfb.addEventListener('connect', () => {
-        if (!disposed) onStatusChange('ready');
+        if (!disposed) onStatusChangeRef.current('ready');
       });
 
       rfb.addEventListener('disconnect', (e) => {
         if (!disposed) {
           console.log('[vnc] disconnected', e.detail);
-          onStatusChange('disconnected');
+          onStatusChangeRef.current('disconnected');
         }
       });
 
       rfb.addEventListener('securityfailure', (e) => {
         if (!disposed) {
           console.error('[vnc] security failure:', e.detail);
-          onStatusChange('error');
+          onStatusChangeRef.current('error');
         }
       });
 
@@ -76,7 +80,7 @@ export default function VncViewer({ tabId, connection, isActive, onStatusChange,
       });
     } catch (err) {
       console.error('[vnc] init error:', err);
-      if (!disposed) onStatusChange('error');
+      if (!disposed) onStatusChangeRef.current('error');
     }
 
     return () => {
@@ -86,7 +90,7 @@ export default function VncViewer({ tabId, connection, isActive, onStatusChange,
       }
       rfbRef.current = null;
     };
-  }, [serverUrl, connection, reconnectCount, onStatusChange]);
+  }, [serverUrl, connection, reconnectCount]);
 
   // Focus the VNC canvas when the tab becomes active
   useEffect(() => {
