@@ -6,18 +6,19 @@ A web-based SSH client and AI-powered terminal assistant, available as both a **
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  Browser / Electron Renderer (React + xterm.js)                 │
+│  Browser / Electron Renderer (React + xterm.js + noVNC)         │
 │                                                                 │
 │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌──────────┐ │
-│  │ Terminal    │  │ GeminiChat │  │ ClaudeChat │  │ Settings │ │
+│  │ Terminal    │  │ VncViewer  │  │ GeminiChat │  │ Settings │ │
 │  └─────┬──────┘  └─────┬──────┘  └─────┬──────┘  └──────────┘ │
-│        │ socket.io      │ HTTP          │ HTTP                  │
+│        │ socket.io      │ WebSocket     │ HTTP                  │
 └────────┼────────────────┼───────────────┼───────────────────────┘
          │                │               │
 ┌────────▼────────────────▼───────────────▼───────────────────────┐
 │  Express Server (Node.js)                                       │
 │                                                                 │
 │  socket.io → SSH (ssh2) / local PTY (node-pty)                  │
+│  /vnc-proxy → WebSocket-to-TCP proxy (VNC)                      │
 │  /api/gemini → Vertex AI / Google AI                            │
 │  /api/claude → Anthropic API                                    │
 └─────────────────────────────────────────────────────────────────┘
@@ -42,7 +43,8 @@ juni-cli/
 │           │   ├── GeminiChat.jsx         ← Gemini chat + agent loop
 │           │   ├── ClaudeChat.jsx         ← Claude chat
 │           │   ├── Terminal.jsx           ← xterm.js terminal
-│           │   └── ConnectionForm.jsx     ← SSH/local connection dialog
+│           │   ├── ConnectionForm.jsx     ← SSH/VNC connection dialog
+│           │   └── VncViewer.jsx          ← noVNC remote desktop viewer
 │           └── utils/
 │               └── smartTruncate.js       ← Output truncation utility
 ├── apps/
@@ -85,12 +87,90 @@ npm run dev
 ## Features
 
 - **Multi-tab SSH terminals** with xterm.js
+- **VNC remote desktop** via noVNC (WebSocket-to-TCP proxy)
 - **Local terminal** via node-pty (Proton only, for localhost connections)
+- **Terminal sharing** via WebSocket relay (host/viewer model)
 - **Gemini AI chat** with agent mode (autonomous command execution via function calling)
 - **Claude AI chat** via Anthropic API
 - **Draggable split-screen** between terminal and AI chat (horizontal or vertical)
 - **Agent controls**: pause, resume, stop, retry
-- **Customizable**: font family, font size, split orientation via settings panel
+- **Customizable**: font family, font size, background color, split orientation
+
+## Production Build
+
+> **Prerequisites:** Node.js 20+
+
+### Web App
+
+```bash
+cd juni-cli
+npm install
+
+# Build the client bundle
+cd apps/web/client
+npm run build
+
+# Start the production server
+cd ../
+NODE_ENV=production node server/index.js
+```
+
+The server runs on port `3001` by default. See [apps/web/DEPLOY.md](apps/web/DEPLOY.md) for Nginx + systemd setup.
+
+### Proton Desktop App (macOS)
+
+```bash
+cd juni-cli
+npm install
+
+# Build distributable .dmg + .zip
+cd apps/proton
+npm run build
+```
+
+Output → `apps/proton/release/`:
+- `juni-cli-proton-1.0.0.dmg` — installer
+- `juni-cli-proton-1.0.0-mac.zip` — portable zip
+
+For a quick test build (no installers):
+
+```bash
+npm run pack
+# → release/mac-arm64/juni-cli-proton.app
+```
+
+### Proton Desktop App (Linux)
+
+```bash
+# Install build dependencies
+sudo apt-get install -y build-essential python3 make \
+  libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 \
+  xdg-utils libatspi2.0-0 libdrm2 libgbm1 libasound2
+
+cd juni-cli
+npm install
+
+# Build .AppImage + .deb
+cd apps/proton
+npm run build:linux
+```
+
+Output → `apps/proton/release/`:
+- `juni-cli-proton-1.0.0.AppImage` — portable
+- `juni-cli-proton_1.0.0_amd64.deb` — Debian/Ubuntu package
+
+### Environment
+
+Create `.env` in the app directory (`apps/proton/.env` or `apps/web/.env`):
+
+```env
+GCP_PROJECT_ID=your-gcp-project-id
+GCP_LOCATION=us-central1
+GEMINI_API_KEY=AIza...
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+For Vertex AI, run `gcloud auth application-default login` or set `GOOGLE_APPLICATION_CREDENTIALS`.
 
 ## Deployment
 
