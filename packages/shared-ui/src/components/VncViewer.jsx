@@ -47,10 +47,13 @@ export default function VncViewer({ tabId, connection, isActive, onStatusChange,
 
       rfbRef.current = rfb;
 
-      // Styling
+      // Performance & display settings
       rfb.scaleViewport = true;
       rfb.resizeSession = true;
       rfb.background = '#0d1117';
+      rfb.qualityLevel = 6;       // 0-9: lower = faster, more artifacts
+      rfb.compressionLevel = 2;   // 0-9: higher = more CPU, less bandwidth
+      rfb.showDotCursor = true;   // lightweight cursor rendering
 
       rfb.addEventListener('connect', () => {
         if (!disposed) onStatusChangeRef.current('ready');
