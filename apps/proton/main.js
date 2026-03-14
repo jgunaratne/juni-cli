@@ -266,14 +266,7 @@ function startServer() {
     const net = require('net');
     const { WebSocketServer } = require('ws');
 
-    // Accept the 'binary' sub-protocol that noVNC requests
-    const vncWss = new WebSocketServer({
-      noServer: true,
-      handleProtocols: (protocols) => {
-        if (protocols.has('binary')) return 'binary';
-        return false;
-      },
-    });
+    const vncWss = new WebSocketServer({ noServer: true });
 
     server.on('upgrade', (request, socket, head) => {
       const url = new URL(request.url, `http://${request.headers.host}`);

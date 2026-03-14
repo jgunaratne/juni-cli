@@ -39,7 +39,6 @@ export default function VncViewer({ tabId, connection, isActive, onStatusChange,
 
       rfb = new RFB(containerRef.current, wsUrl, {
         credentials: creds,
-        wsProtocols: ['binary'],
       });
 
       rfbRef.current = rfb;
