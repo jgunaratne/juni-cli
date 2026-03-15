@@ -1,35 +1,34 @@
 import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import RFB from 'novnc-next';
-import KeyTable from 'novnc-next/core/input/keysym';
 
-/* ── Key name → X11 keysym mapping ───────────────────── */
+/* ── X11 keysym constants (inlined — novnc-next does not export subpaths) */
 
 const KEY_MAP = {
-  ctrl: KeyTable.XK_Control_L,
-  control: KeyTable.XK_Control_L,
-  alt: KeyTable.XK_Alt_L,
-  shift: KeyTable.XK_Shift_L,
-  super: KeyTable.XK_Super_L,
-  meta: KeyTable.XK_Super_L,
-  enter: KeyTable.XK_Return,
-  return: KeyTable.XK_Return,
-  tab: KeyTable.XK_Tab,
-  escape: KeyTable.XK_Escape,
-  esc: KeyTable.XK_Escape,
-  backspace: KeyTable.XK_BackSpace,
-  delete: KeyTable.XK_Delete,
-  space: KeyTable.XK_space,
-  up: KeyTable.XK_Up,
-  down: KeyTable.XK_Down,
-  left: KeyTable.XK_Left,
-  right: KeyTable.XK_Right,
-  home: KeyTable.XK_Home,
-  end: KeyTable.XK_End,
-  pageup: KeyTable.XK_Page_Up,
-  pagedown: KeyTable.XK_Page_Down,
-  f1: KeyTable.XK_F1, f2: KeyTable.XK_F2, f3: KeyTable.XK_F3, f4: KeyTable.XK_F4,
-  f5: KeyTable.XK_F5, f6: KeyTable.XK_F6, f7: KeyTable.XK_F7, f8: KeyTable.XK_F8,
-  f9: KeyTable.XK_F9, f10: KeyTable.XK_F10, f11: KeyTable.XK_F11, f12: KeyTable.XK_F12,
+  ctrl: 0xffe3,       // XK_Control_L
+  control: 0xffe3,
+  alt: 0xffe9,         // XK_Alt_L
+  shift: 0xffe1,       // XK_Shift_L
+  super: 0xffeb,       // XK_Super_L
+  meta: 0xffeb,
+  enter: 0xff0d,       // XK_Return
+  return: 0xff0d,
+  tab: 0xff09,         // XK_Tab
+  escape: 0xff1b,      // XK_Escape
+  esc: 0xff1b,
+  backspace: 0xff08,   // XK_BackSpace
+  delete: 0xffff,      // XK_Delete
+  space: 0x0020,       // XK_space
+  up: 0xff52,          // XK_Up
+  down: 0xff54,        // XK_Down
+  left: 0xff51,        // XK_Left
+  right: 0xff53,       // XK_Right
+  home: 0xff50,        // XK_Home
+  end: 0xff57,         // XK_End
+  pageup: 0xff55,      // XK_Page_Up
+  pagedown: 0xff56,    // XK_Page_Down
+  f1: 0xffbe, f2: 0xffbf, f3: 0xffc0, f4: 0xffc1,
+  f5: 0xffc2, f6: 0xffc3, f7: 0xffc4, f8: 0xffc5,
+  f9: 0xffc6, f10: 0xffc7, f11: 0xffc8, f12: 0xffc9,
 };
 
 function keyNameToKeysym(name) {
