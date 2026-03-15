@@ -183,7 +183,7 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
   }, [fontFamily, fontSize, bgColor]);
 
   useEffect(() => {
-    if (!serverUrl) return;
+    const effectiveServerUrl = serverUrl || window.location.origin;
 
     const term = new XTerm({
       cursorBlink: true,
@@ -259,7 +259,7 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
     }
     term.writeln('');
 
-    const socket = io(serverUrl, { transports: ['websocket'] });
+    const socket = io(effectiveServerUrl, { transports: ['websocket'] });
     socketRef.current = socket;
 
     socket.on('connect', () => {
