@@ -5,8 +5,6 @@ import { io } from 'socket.io-client';
 
 import '@xterm/xterm/css/xterm.css';
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || window.location.origin;
-
 const AGENT_SENTINEL = '__JUNI_AGENT_DONE__';
 
 // Comprehensive ANSI/terminal escape code stripping
@@ -265,7 +263,7 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
     term.writeln('');
 
     // ── Socket.io ─────────────────────────────────────────────
-    const socket = io(SERVER_URL, { transports: ['websocket'] });
+    const socket = io({ transports: ['websocket'] });
     socketRef.current = socket;
 
     socket.on('connect', () => {

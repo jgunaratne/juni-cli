@@ -3,7 +3,7 @@ import { ConnectionForm, Terminal, SharedTerminal, GeminiChat, VncViewer } from 
 
 import './App.css';
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || window.location.origin;
+const SERVER_URL = '';
 
 let nextId = 1;
 const SPLIT_GEMINI_ID = '__split_gemini__';

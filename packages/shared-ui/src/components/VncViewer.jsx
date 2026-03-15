@@ -226,9 +226,15 @@ const VncViewer = forwardRef(function VncViewer(
 
     const { host, port, password, username } = connection;
 
-    // Build the proxy WebSocket URL
-    const serverBase = serverUrl.replace(/^http/, 'ws');
-    const wsUrl = `${serverBase}/vnc-proxy?host=${encodeURIComponent(host)}&port=${encodeURIComponent(port)}`;
+    // Build the proxy WebSocket URL — derive protocol from page to prevent mixed content
+    let wsUrl;
+    if (serverUrl && /^https?:\/\//.test(serverUrl)) {
+      const serverBase = serverUrl.replace(/^http/, 'ws');
+      wsUrl = `${serverBase}/vnc-proxy?host=${encodeURIComponent(host)}&port=${encodeURIComponent(port)}`;
+    } else {
+      const wsProto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      wsUrl = `${wsProto}://${window.location.host}/vnc-proxy?host=${encodeURIComponent(host)}&port=${encodeURIComponent(port)}`;
+    }
 
     onStatusChangeRef.current('connecting');
 
