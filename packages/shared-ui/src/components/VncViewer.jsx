@@ -218,7 +218,7 @@ const VncViewer = forwardRef(function VncViewer(
   /* ── RFB connection effect ─────────────────────────── */
 
   useEffect(() => {
-    if (!serverUrl || !connection) return;
+    if (!connection) return;
 
     let rfb = null;
     let disposed = false;
