@@ -55,6 +55,23 @@ async function callGeminiAgent(serverUrl, model, history, signal) {
   return data.parts ?? [{ text: 'No response generated.' }];
 }
 
+async function callGeminiVncAgent(serverUrl, model, history, signal) {
+  const res = await fetch(`${serverUrl}/api/gemini/vnc-agent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model, history }),
+    signal,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error || `HTTP ${res.status}`);
+  }
+
+  const data = await res.json();
+  return data.parts ?? [{ text: 'No response generated.' }];
+}
+
 
 /* ── Simple markdown → ANSI-style terminal rendering ── */
 
@@ -88,6 +105,10 @@ const GeminiChat = forwardRef(function GeminiChat({
   onAutoExecuteChange,
   onSendToTerminal,
   serverUrl,
+  /* VNC agent props */
+  isVncActive = false,
+  onCaptureVncScreenshot,
+  onExecuteVncAction,
 }, ref) {
   const pastedTextRef = useRef(null);
   const autoSendRef = useRef(false);
@@ -364,6 +385,209 @@ const GeminiChat = forwardRef(function GeminiChat({
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
+    /* ── VNC Agent Loop ─────────────────────────────────── */
+    if (isVncActive && onCaptureVncScreenshot && onExecuteVncAction) {
+      const maxVncSteps = 50;
+      let vncHistory = [];
+
+      // Initial prompt with screenshot
+      const screenshot = onCaptureVncScreenshot();
+      if (!screenshot) {
+        setAgentSteps([{ type: 'error', text: 'Could not capture VNC screenshot', status: 'done' }]);
+        setAgentRunning(false);
+        setIsLoading(false);
+        return;
+      }
+
+      vncHistory.push({
+        role: 'user',
+        parts: [
+          { text: userText },
+          { inlineData: { mimeType: 'image/jpeg', data: screenshot.base64 } },
+        ],
+      });
+
+      setMessages((prev) => [...prev, { type: 'system', text: `🖥️ VNC Agent: "${userText}"` }]);
+
+      try {
+        for (let step = 0; step < maxVncSteps; step++) {
+          if (abortAgentRef.current) {
+            setAgentSteps((prev) => [...prev, { type: 'aborted', status: 'done' }]);
+            break;
+          }
+
+          // Check for pause
+          if (pausedResolverRef.current === 'pending') {
+            setAgentPaused(true);
+            await new Promise((resolve) => {
+              pausedResolverRef.current = resolve;
+            });
+            setAgentPaused(false);
+            if (abortAgentRef.current) {
+              setAgentSteps((prev) => [...prev, { type: 'aborted', status: 'done' }]);
+              break;
+            }
+          }
+
+          setIsLoading(true);
+          const parts = await callGeminiVncAgent(serverUrl, model, vncHistory, controller.signal);
+          setIsLoading(false);
+
+          const functionCall = parts.find((p) => p.functionCall);
+          const textPart = parts.find((p) => p.text);
+
+          if (!functionCall) {
+            // Text response — display and stop
+            if (textPart) {
+              setMessages((prev) => [...prev, { type: 'model', text: renderForTerminal(textPart.text) }]);
+            }
+            break;
+          }
+
+          const { name, args } = functionCall.functionCall;
+
+          // Handle task_complete
+          if (name === 'task_complete') {
+            setAgentSteps((prev) => [...prev, {
+              type: 'complete',
+              summary: args.summary,
+              status: 'done',
+            }]);
+            vncHistory.push(
+              { role: 'model', parts },
+              { role: 'user', parts: [{ functionResponse: { name: 'task_complete', response: { acknowledged: true } } }] },
+            );
+            break;
+          }
+
+          // Handle ask_user
+          if (name === 'ask_user') {
+            vncHistory.push({ role: 'model', parts });
+
+            setAgentSteps((prev) => [...prev, {
+              type: 'ask_user',
+              question: args.question,
+              reasoning: args.reasoning,
+              status: 'waiting',
+            }]);
+
+            setAgentQuestion(args.question);
+            const answer = await new Promise((resolve) => {
+              questionResolverRef.current = resolve;
+            });
+
+            if (abortAgentRef.current) break;
+
+            setAgentSteps((prev) => prev.map((s, idx) =>
+              idx === prev.length - 1 ? { ...s, answer, status: 'done' } : s
+            ));
+
+            // Take a fresh screenshot with the answer
+            const freshShot = onCaptureVncScreenshot();
+            const answerParts = [{ functionResponse: { name: 'ask_user', response: { answer } } }];
+            if (freshShot) {
+              answerParts.push({ inlineData: { mimeType: 'image/jpeg', data: freshShot.base64 } });
+            }
+            vncHistory.push({ role: 'user', parts: answerParts });
+            continue;
+          }
+
+          // Desktop action — log it
+          const actionLabel = name === 'click'
+            ? `🖱 Click (${(args.normalizedX || 0).toFixed(2)}, ${(args.normalizedY || 0).toFixed(2)}) ${args.button || 'left'}${(args.clickCount || 1) > 1 ? ' ×' + args.clickCount : ''}`
+            : name === 'type_text'
+            ? `⌨️ Type: "${(args.text || '').slice(0, 40)}${(args.text || '').length > 40 ? '…' : ''}"`
+            : name === 'key_combo'
+            ? `⌨️ Keys: ${(args.keys || []).join('+')}`
+            : name === 'scroll'
+            ? `🖱 Scroll dy=${args.dy}`
+            : name === 'mouse_move'
+            ? `🖱 Move (${(args.normalizedX || 0).toFixed(2)}, ${(args.normalizedY || 0).toFixed(2)})`
+            : name === 'wait'
+            ? `⏳ Wait ${args.seconds || 1}s`
+            : name === 'take_screenshot'
+            ? `📸 Screenshot`
+            : `❓ ${name}`;
+
+          // Step-through approval
+          if (stepThrough) {
+            const approved = await requestApproval('vnc_action', actionLabel, args.reasoning || '');
+            if (abortAgentRef.current) break;
+            if (!approved) {
+              vncHistory.push(
+                { role: 'model', parts },
+                { role: 'user', parts: [{ functionResponse: { name, response: { success: false, error: 'User skipped' } } }] },
+              );
+              setAgentSteps((prev) => [...prev, {
+                type: 'vnc_action',
+                action: actionLabel,
+                reasoning: args.reasoning,
+                status: 'skipped',
+              }]);
+              continue;
+            }
+          }
+
+          setAgentSteps((prev) => [...prev, {
+            type: 'vnc_action',
+            action: actionLabel,
+            reasoning: args.reasoning,
+            status: 'running',
+          }]);
+
+          // Execute the action
+          const result = await onExecuteVncAction({ name, args });
+
+          setAgentSteps((prev) => prev.map((s, i) =>
+            i === prev.length - 1
+              ? { ...s, status: result.success ? 'done' : 'error', output: result.error }
+              : s
+          ));
+
+          // Wait for screen to update after action
+          const waitMs = name === 'wait' ? 0 : 500; // wait action already waited
+          if (waitMs > 0) await new Promise((r) => setTimeout(r, waitMs));
+
+          // Take new screenshot
+          const newScreenshot = onCaptureVncScreenshot();
+          const responseParts = [{ functionResponse: { name, response: { success: result.success, error: result.error } } }];
+          if (newScreenshot) {
+            responseParts.push({ inlineData: { mimeType: 'image/jpeg', data: newScreenshot.base64 } });
+          }
+
+          vncHistory.push(
+            { role: 'model', parts },
+            { role: 'user', parts: responseParts },
+          );
+        }
+      } catch (err) {
+        setIsLoading(false);
+        if (err?.name === 'AbortError') {
+          setAgentSteps((prev) => [...prev, { type: 'aborted', status: 'done' }]);
+        } else {
+          setAgentSteps((prev) => [...prev, {
+            type: 'error',
+            text: err instanceof Error ? err.message : 'VNC Agent error',
+            status: 'done',
+          }]);
+        }
+      } finally {
+        setAgentRunning(false);
+        setAgentPaused(false);
+        setAgentStopping(false);
+        setPendingApproval(null);
+        setAgentQuestion(null);
+        pausedResolverRef.current = null;
+        abortControllerRef.current = null;
+        questionResolverRef.current = null;
+        approvalResolverRef.current = null;
+        setIsLoading(false);
+        requestAnimationFrame(() => inputRef.current?.focus());
+      }
+      return;
+    }
+
+    /* ── Standard SSH Agent Loop ──────────────────────── */
     const userEntry = { role: 'user', parts: [{ text: userText }] };
     let history = [...agentHistory, userEntry];
     setAgentHistory(history);
@@ -558,7 +782,7 @@ const GeminiChat = forwardRef(function GeminiChat({
       setIsLoading(false);
       requestAnimationFrame(() => inputRef.current?.focus());
     }
-  }, [agentHistory, runAgentStep, executeAgentCommand, executeAgentSendKeys, onReadTerminal, stepThrough, requestApproval]);
+  }, [agentHistory, runAgentStep, executeAgentCommand, executeAgentSendKeys, onReadTerminal, stepThrough, requestApproval, isVncActive, onCaptureVncScreenshot, onExecuteVncAction, serverUrl, model]);
 
   const stopAgent = useCallback(() => {
     abortAgentRef.current = true;
@@ -973,6 +1197,26 @@ const GeminiChat = forwardRef(function GeminiChat({
                   <pre className="agent-step-output">
                     {step.output}
                   </pre>
+                )}
+              </>
+            )}
+            {step.type === 'vnc_action' && (
+              <>
+                <div className="agent-step-header">
+                  [{step.status === 'running' ? 'executing' : step.status === 'skipped' ? 'skipped' : step.status === 'error' ? 'failed' : 'done'}] {step.reasoning}
+                </div>
+                <div className="agent-step-command agent-step-keys">
+                  {step.action}
+                </div>
+                {step.output && (
+                  <div className="agent-step-error">
+                    {step.output}
+                  </div>
+                )}
+                {step.status === 'skipped' && (
+                  <div className="agent-step-skipped-msg">
+                    skipped by user
+                  </div>
                 )}
               </>
             )}

@@ -124,6 +124,7 @@ function App() {
 
 
   const terminalRefs = useRef({});
+  const vncRefs = useRef({});
   const splitGeminiRef = useRef(null);
   const settingsRef = useRef(null);
   const connectDialogRef = useRef(null);
@@ -909,11 +910,26 @@ function App() {
                     onAutoExecuteChange={setAutoExecute}
                     onSendToTerminal={splitMode ? sendToTerminal : undefined}
                     serverUrl={serverUrl}
+                    isVncActive={!!tabs.find((t) => t.id === activeTab && t.type === 'vnc')}
+                    onCaptureVncScreenshot={() => {
+                      const vncTab = tabs.find((t) => t.id === activeTab && t.type === 'vnc');
+                      if (!vncTab) return null;
+                      return vncRefs.current[vncTab.id]?.captureScreenshot();
+                    }}
+                    onExecuteVncAction={(action) => {
+                      const vncTab = tabs.find((t) => t.id === activeTab && t.type === 'vnc');
+                      if (!vncTab) return { success: false, error: 'No VNC tab' };
+                      return vncRefs.current[vncTab.id]?.executeAction(action) || { success: false, error: 'VNC ref not found' };
+                    }}
                 />
                 )
             ) : tab.type === 'vnc' ? (
               <VncViewer
                 key={tab.id}
+                ref={(el) => {
+                  if (el) vncRefs.current[tab.id] = el;
+                  else delete vncRefs.current[tab.id];
+                }}
                 tabId={tab.id}
                 connection={tab.connection}
                 isActive={tab.id === activeTab && !showForm}
@@ -984,6 +1000,17 @@ function App() {
                 onAutoExecuteChange={setAutoExecute}
                 onSendToTerminal={sendToTerminal}
                 serverUrl={serverUrl}
+                isVncActive={!!tabs.find((t) => t.id === activeTab && t.type === 'vnc')}
+                onCaptureVncScreenshot={() => {
+                  const vncTab = tabs.find((t) => t.id === activeTab && t.type === 'vnc');
+                  if (!vncTab) return null;
+                  return vncRefs.current[vncTab.id]?.captureScreenshot();
+                }}
+                onExecuteVncAction={(action) => {
+                  const vncTab = tabs.find((t) => t.id === activeTab && t.type === 'vnc');
+                  if (!vncTab) return { success: false, error: 'No VNC tab' };
+                  return vncRefs.current[vncTab.id]?.executeAction(action) || { success: false, error: 'VNC ref not found' };
+                }}
               />
             </div>
           </>

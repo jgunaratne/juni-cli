@@ -1,6 +1,7 @@
 const express = require('express');
 const { getVertexClient, getGeminiClient, GENAI_MODELS } = require('./vertexClient');
 const { AGENT_TOOLS, AGENT_SYSTEM_PROMPT } = require('./agentTools');
+const { VNC_AGENT_TOOLS, VNC_AGENT_SYSTEM_PROMPT } = require('./vncAgentTools');
 
 /**
  * Convert tool schemas from Vertex AI format (uppercase types)
@@ -251,6 +252,148 @@ function createGeminiRoutes({ defaultProject, defaultLocation }) {
       res.json({ parts });
     } catch (err) {
       console.error('[gemini-agent] Error:', err);
+      const message = err instanceof Error ? err.message : 'Internal server error';
+      res.status(500).json({ error: message });
+    }
+  });
+
+  /* ── VNC Agent endpoint ─────────────────────────────── */
+
+  router.post('/vnc-agent', async (req, res) => {
+    try {
+      const {
+        model = 'gemini-3.1-pro-preview',
+        history = [],
+        project,
+        location,
+      } = req.body;
+
+      const resolvedProject = project || defaultProject;
+      const resolvedLocation = location || defaultLocation;
+
+      if (!resolvedProject) {
+        return res.status(400).json({
+          error: 'GCP project ID is required. Set GCP_PROJECT_ID in .env.',
+        });
+      }
+
+      if (history.length === 0) {
+        return res.status(400).json({ error: 'history is required' });
+      }
+
+      const contents = history.map((entry) => ({
+        role: entry.role,
+        parts: entry.parts,
+      }));
+
+      let parts;
+
+      if (GENAI_MODELS.includes(model)) {
+        const client = getGeminiClient(resolvedProject, resolvedLocation);
+
+        // Convert history: replace functionCall/functionResponse with text equivalents
+        const promptContents = contents.map((entry) => {
+          const newParts = entry.parts.map((p) => {
+            if (p.functionCall) {
+              return { text: `[TOOL_CALL] ${JSON.stringify(p.functionCall)}` };
+            }
+            if (p.functionResponse) {
+              return { text: `[TOOL_RESULT] ${JSON.stringify(p.functionResponse)}` };
+            }
+            return p;  // pass through text and inlineData (images)
+          });
+          return { role: entry.role, parts: newParts };
+        });
+
+        const toolPrompt =
+          VNC_AGENT_SYSTEM_PROMPT + '\n\n' +
+          'RESPONSE FORMAT:\n' +
+          'Respond with EXACTLY ONE JSON object, no other text before or after it.\n' +
+          'To call a tool: {"functionCall":{"name":"TOOL_NAME","args":{...}}}\n' +
+          'To reply with text: {"text":"your response"}\n\n' +
+          'Available tools:\n' +
+          '- click: args: normalizedX, normalizedY, button?, clickCount?, reasoning\n' +
+          '- type_text: args: text, reasoning\n' +
+          '- key_combo: args: keys[], reasoning\n' +
+          '- scroll: args: normalizedX, normalizedY, dy, reasoning\n' +
+          '- mouse_move: args: normalizedX, normalizedY, reasoning\n' +
+          '- wait: args: seconds, reasoning\n' +
+          '- take_screenshot: args: reasoning\n' +
+          '- task_complete: args: summary\n' +
+          '- ask_user: args: question, reasoning\n';
+
+        const response = await client.models.generateContent({
+          model,
+          contents: promptContents,
+          config: {
+            systemInstruction: toolPrompt,
+            temperature: 0.3,
+            maxOutputTokens: 4096,
+          },
+        });
+
+        const responseText = response?.text || response?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        console.log('[vnc-agent] response:', responseText?.slice(0, 300));
+
+        // Extract JSON using bracket counting
+        function extractFirstJSON(str) {
+          let depth = 0;
+          let start = -1;
+          for (let i = 0; i < str.length; i++) {
+            if (str[i] === '{') {
+              if (depth === 0) start = i;
+              depth++;
+            } else if (str[i] === '}') {
+              depth--;
+              if (depth === 0 && start >= 0) {
+                return str.slice(start, i + 1);
+              }
+            }
+          }
+          return null;
+        }
+
+        try {
+          let cleaned = responseText.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
+          cleaned = cleaned.replace(/^\[TOOL_CALL\]\s*/i, '');
+          const jsonStr = extractFirstJSON(cleaned);
+          if (!jsonStr) throw new Error('No JSON found');
+          const parsed = JSON.parse(jsonStr);
+
+          if (parsed.functionCall) {
+            parts = [{ functionCall: parsed.functionCall }];
+          } else if (parsed.name && parsed.args) {
+            parts = [{ functionCall: { name: parsed.name, args: parsed.args } }];
+          } else if (parsed.text) {
+            parts = [{ text: parsed.text }];
+          } else {
+            parts = [{ text: responseText }];
+          }
+        } catch {
+          parts = [{ text: responseText || 'The model returned an empty response.' }];
+        }
+      } else {
+        // Legacy models with native function calling
+        const vertexAI = getVertexClient(resolvedProject, resolvedLocation);
+        const generativeModel = vertexAI.getGenerativeModel({
+          model,
+          systemInstruction: VNC_AGENT_SYSTEM_PROMPT,
+          tools: VNC_AGENT_TOOLS,
+          generationConfig: {
+            temperature: 0.3,
+            maxOutputTokens: 4096,
+          },
+        });
+
+        const result = await generativeModel.generateContent({ contents });
+        const response = result.response;
+        const candidate = response?.candidates?.[0];
+        parts = candidate?.content?.parts ?? [{ text: 'No response generated.' }];
+      }
+
+      res.json({ parts });
+    } catch (err) {
+      console.error('[vnc-agent] Error:', err);
       const message = err instanceof Error ? err.message : 'Internal server error';
       res.status(500).json({ error: message });
     }
