@@ -263,7 +263,7 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
     term.writeln('');
 
     // ── Socket.io ─────────────────────────────────────────────
-    const socket = io({ transports: ['websocket'] });
+    const socket = io(window.location.origin, { transports: ['websocket'] });
     socketRef.current = socket;
 
     socket.on('connect', () => {
