@@ -11,6 +11,15 @@ function setupSshHandler(io) {
     socket.on('ssh:connect', (credentials) => {
       const { host, port = 22, username, password, privateKey } = credentials;
 
+      if (!host || typeof host !== 'string') {
+        socket.emit('ssh:error', { message: 'Host is required' });
+        return;
+      }
+      if (!username || typeof username !== 'string') {
+        socket.emit('ssh:error', { message: 'Username is required' });
+        return;
+      }
+
       console.log(`[ssh] connecting to ${username}@${host}:${port}`);
       sshClient = new Client();
 
