@@ -1,5 +1,5 @@
 const express = require('express');
-const { getVertexClient, getGeminiClient, GENAI_MODELS } = require('./vertexClient');
+const { getVertexClient, getGeminiClient, getGeminiApiKeyClient, GENAI_MODELS } = require('./vertexClient');
 const { AGENT_TOOLS, AGENT_SYSTEM_PROMPT } = require('./agentTools');
 const { VNC_AGENT_TOOLS, VNC_AGENT_SYSTEM_PROMPT } = require('./vncAgentTools');
 
@@ -25,6 +25,17 @@ function convertToolsForGenAI(tools) {
   return convertSchemaValue(tools);
 }
 
+function resolveGenAIClient(resolvedProject, resolvedLocation) {
+  if (resolvedProject) {
+    return getGeminiClient(resolvedProject, resolvedLocation);
+  }
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (apiKey) {
+    return getGeminiApiKeyClient(apiKey);
+  }
+  return null;
+}
+
 function createGeminiRoutes({ defaultProject, defaultLocation }) {
   const router = express.Router();
 
@@ -44,17 +55,16 @@ function createGeminiRoutes({ defaultProject, defaultLocation }) {
       const resolvedProject = project || defaultProject;
       const resolvedLocation = location || defaultLocation;
 
-      if (!resolvedProject) {
-        return res.status(400).json({
-          error: 'GCP project ID is required. Set GCP_PROJECT_ID in .env.',
-        });
-      }
-
       let text;
 
       if (GENAI_MODELS.includes(model)) {
-        // Gemini 3 models → @google/genai via Vertex AI
-        const client = getGeminiClient(resolvedProject, resolvedLocation);
+        // Gemini 3 models → @google/genai via Vertex AI or API key
+        const client = resolveGenAIClient(resolvedProject, resolvedLocation);
+        if (!client) {
+          return res.status(400).json({
+            error: 'No credentials available. Set GCP_PROJECT_ID or GEMINI_API_KEY in .env.',
+          });
+        }
         const response = await client.models.generateContent({
           model,
           contents: messages.map((m) => ({
@@ -136,17 +146,16 @@ function createGeminiRoutes({ defaultProject, defaultLocation }) {
         return res.status(400).json({ error: 'history is required' });
       }
 
-      if (!resolvedProject) {
-        return res.status(400).json({
-          error: 'GCP project ID is required. Set GCP_PROJECT_ID in .env.',
-        });
-      }
-
       let parts;
 
       if (GENAI_MODELS.includes(model)) {
         // Gemini 3 preview: use prompt-based tool calling (native function calling is unreliable)
-        const client = getGeminiClient(resolvedProject, resolvedLocation);
+        const client = resolveGenAIClient(resolvedProject, resolvedLocation);
+        if (!client) {
+          return res.status(400).json({
+            error: 'No credentials available. Set GCP_PROJECT_ID or GEMINI_API_KEY in .env.',
+          });
+        }
 
         // Convert history: replace functionCall/functionResponse with text equivalents
         const promptContents = contents.map((entry) => {
@@ -271,12 +280,6 @@ function createGeminiRoutes({ defaultProject, defaultLocation }) {
       const resolvedProject = project || defaultProject;
       const resolvedLocation = location || defaultLocation;
 
-      if (!resolvedProject) {
-        return res.status(400).json({
-          error: 'GCP project ID is required. Set GCP_PROJECT_ID in .env.',
-        });
-      }
-
       if (history.length === 0) {
         return res.status(400).json({ error: 'history is required' });
       }
@@ -289,7 +292,12 @@ function createGeminiRoutes({ defaultProject, defaultLocation }) {
       let parts;
 
       if (GENAI_MODELS.includes(model)) {
-        const client = getGeminiClient(resolvedProject, resolvedLocation);
+        const client = resolveGenAIClient(resolvedProject, resolvedLocation);
+        if (!client) {
+          return res.status(400).json({
+            error: 'No credentials available. Set GCP_PROJECT_ID or GEMINI_API_KEY in .env.',
+          });
+        }
 
         // Convert history: replace functionCall/functionResponse with text equivalents
         const promptContents = contents.map((entry) => {

@@ -22,8 +22,6 @@ const io = new Server(server, {
           'http://127.0.0.1:5173',
           'http://localhost:3001',
           'http://127.0.0.1:3001',
-          'https://junius.servehttp.com',
-          'http://junius.servehttp.com',
         ],
     methods: ['GET', 'POST'],
   },

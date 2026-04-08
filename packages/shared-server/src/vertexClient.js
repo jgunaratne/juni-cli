@@ -13,7 +13,7 @@ function getVertexClient(project, location) {
   return vertexCache.get(key);
 }
 
-/* ── @google/genai client (for Gemini 3 models via Vertex AI) */
+/* ── @google/genai client (for Gemini 3 models via Vertex AI or API key) */
 
 const genaiCache = new Map();
 
@@ -44,7 +44,18 @@ function getGeminiClient(project, location) {
   return genaiCache.get(key);
 }
 
+/**
+ * Creates a GoogleGenAI client using a Gemini API key directly (no GCP project needed).
+ */
+function getGeminiApiKeyClient(apiKey) {
+  const key = `genai-apikey::${apiKey}`;
+  if (!genaiCache.has(key)) {
+    genaiCache.set(key, new GoogleGenAI({ apiKey }));
+  }
+  return genaiCache.get(key);
+}
+
 // Models that use @google/genai via Vertex AI instead of @google-cloud/vertexai
 const GENAI_MODELS = ['gemini-3.1-flash-preview', 'gemini-3.1-pro-preview', 'gemini-3.1-pro-preview-customtools'];
 
-module.exports = { getVertexClient, getGeminiClient, GENAI_MODELS };
+module.exports = { getVertexClient, getGeminiClient, getGeminiApiKeyClient, GENAI_MODELS };
