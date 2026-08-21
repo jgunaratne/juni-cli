@@ -1118,8 +1118,17 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
-  height: 40px;
+  /* The agent controls can reach seven buttons at once (Retry, Agent, Step,
+     Auto-exec, New Chat, Terminal, Clear). In a narrow split panel they no
+     longer overflow the row — they wrap onto another line instead. */
+  flex-wrap: wrap;
+  row-gap: 6px;
+  column-gap: 12px;
+  /* 28px buttons + 6px top/bottom keeps an unwrapped toolbar at exactly the
+     40px it was before; min-height lets extra rows grow it. */
+  padding: 6px 16px;
+  min-height: 40px;
+  box-sizing: border-box;
   background: var(--terminal-bg, #0d1117);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
@@ -1554,6 +1563,13 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  /* Wrap inside the group too: without this the group is one unwrappable flex
+     item that overflows instead of breaking. min-width lets it shrink below
+     its content width so the wrap can happen at all. */
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .agent-stop-btn {

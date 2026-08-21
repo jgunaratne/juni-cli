@@ -5,7 +5,8 @@ import { io } from 'socket.io-client';
 
 import '@xterm/xterm/css/xterm.css';
 
-const AGENT_SENTINEL = '__JUNI_AGENT_DONE__';
+// Base marker; each command appends its own sequence number and a closing __.
+const AGENT_SENTINEL = '__JUNI_AGENT_DONE';
 
 const stripAnsi = (str) => str
   .replace(/\x1b\[[\?=>!]?[0-9;]*[a-zA-Z]/g, '')
@@ -26,6 +27,7 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
   const fitRef = useRef(null);
   const socketRef = useRef(null);
   const agentCaptureRef = useRef(null);
+  const agentSeqRef = useRef(0);
   const agentKeysRef = useRef(null);
   const onTerminalOutputRef = useRef(onTerminalOutput);
   // Keep the output callback ref current on every render
@@ -58,7 +60,7 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
         clearTimeout(timer);
         agentCaptureRef.current = null;
         const raw = stripAnsi(buffer).trim();
-        resolve(raw || '(aborted by user)');
+        resolve({ output: raw || '(aborted by user)', timedOut: false, exitCode: null, aborted: true });
       }
       if (agentKeysRef.current) {
         const { resolve, timer, cleanup } = agentKeysRef.current;
@@ -104,13 +106,20 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
           'Space': ' ',
         };
 
-        const tokens = keys.split(/\s+/);
+        // Whitespace separates key names from literal text, but two adjacent
+        // literals were being glued together — "git commit -m x Enter" arrived
+        // as "gitcommit-mx". Spaces are restored between neighbouring literals
+        // while key names stay as control codes.
+        const tokens = keys.split(/\s+/).filter((t) => t.length > 0);
         let payload = '';
-        for (const token of tokens) {
+        for (let i = 0; i < tokens.length; i++) {
+          const token = tokens[i];
           if (KEY_MAP[token] !== undefined) {
             payload += KEY_MAP[token];
           } else {
             payload += token;
+            const next = tokens[i + 1];
+            if (next !== undefined && KEY_MAP[next] === undefined) payload += ' ';
           }
         }
 
@@ -139,22 +148,33 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
     runAgentCommand: (command) => {
       return new Promise((resolve) => {
         if (!socketRef.current) {
-          resolve('Error: terminal not connected');
+          resolve({ output: 'Error: terminal not connected', timedOut: false, exitCode: null });
           return;
         }
+        // A timed-out command is abandoned here but keeps running on the remote,
+        // so its sentinel arrives later — during some *later* capture. A shared
+        // sentinel would let that straggler complete the next command with the
+        // wrong output, so each command gets its own.
+        const seq = ++agentSeqRef.current;
+        const sentinel = `${AGENT_SENTINEL}_${seq}__`;
         const timer = setTimeout(() => {
-          if (agentCaptureRef.current) {
+          if (agentCaptureRef.current && agentCaptureRef.current.seq === seq) {
             const raw = stripAnsi(agentCaptureRef.current.buffer).trim();
             agentCaptureRef.current = null;
-            resolve(raw || '(command timed out after 20s — it may be waiting for input)');
+            // timedOut is reported as a field, never by wording inside output:
+            // a command that times out after printing something still has a
+            // truthy buffer, and callers must not have to guess from the text.
+            resolve({ output: raw, timedOut: true, exitCode: null });
           }
         }, 20000);
-        agentCaptureRef.current = { buffer: '', resolve, timer };
+        agentCaptureRef.current = { buffer: '', resolve, timer, seq, sentinel };
         // Prefix with PAGER=cat so git log, man, etc. don't open pagers that trap the agent.
         // Send the command with sentinel on a NEW LINE so heredocs & multi-line
-        // commands finish before the sentinel echo runs.
+        // commands finish before the sentinel echo runs. `:$?` carries the exit
+        // status back, which is the only reliable success/failure signal —
+        // output text alone cannot be classified.
         const wrappedCmd = `PAGER=cat ${command}`;
-        socketRef.current.emit('ssh:data', `${wrappedCmd}\necho ${AGENT_SENTINEL}\n`);
+        socketRef.current.emit('ssh:data', `${wrappedCmd}\necho ${sentinel}:$?\n`);
       });
     },
   }));
@@ -278,7 +298,9 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
       if (agentCaptureRef.current) {
         agentCaptureRef.current.buffer += data;
         const stripped = stripAnsi(agentCaptureRef.current.buffer);
-        const sentinelPattern = /[\r\n]__JUNI_AGENT_DONE__/;
+        // Anchored to a line start so the shell's echo of the command line
+        // itself ("echo __JUNI_AGENT_DONE_7__:$?") cannot end the capture.
+        const sentinelPattern = new RegExp(`[\\r\\n]${agentCaptureRef.current.sentinel}:(\\d+)`);
         const match = sentinelPattern.exec(stripped);
         if (match) {
           const { resolve, timer } = agentCaptureRef.current;
@@ -289,7 +311,7 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
           const output = firstNewline >= 0
             ? beforeSentinel.substring(firstNewline + 1).trim()
             : beforeSentinel.trim();
-          resolve(output);
+          resolve({ output, timedOut: false, exitCode: Number(match[1]) });
         }
       }
     });

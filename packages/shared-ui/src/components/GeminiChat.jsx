@@ -56,7 +56,8 @@ async function callGemini(serverUrl, model, messages) {
 }
 
 async function callGeminiAgent(serverUrl, model, history, signal) {
-  const res = await fetch(`${serverUrl}/api/gemini/agent`, {
+  const endpoint = isClaudeModel(model) ? 'claude' : 'gemini';
+  const res = await fetch(`${serverUrl}/api/${endpoint}/agent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ model, history }),
@@ -219,6 +220,8 @@ const GeminiChat = forwardRef(function GeminiChat({
       if (name === 'read_terminal') {
         return { type: 'read_terminal', reasoning: args.reasoning, parts };
       }
+
+      return { type: 'unknown_tool', name, parts };
     }
 
     if (textPart) {
@@ -258,14 +261,21 @@ const GeminiChat = forwardRef(function GeminiChat({
       status: 'running',
     }]);
 
-    let output = '';
+    let result = { output: '(No terminal connected for agent execution)', timedOut: false, exitCode: null };
     if (onRunAgentCommand) {
-      output = await onRunAgentCommand(command);
-    } else {
-      output = '(No terminal connected for agent execution)';
+      const raw = await onRunAgentCommand(command);
+      // Hosts used to resolve a bare string; normalise so either shape works.
+      result = typeof raw === 'string' ? { output: raw, timedOut: false, exitCode: null } : (raw || result);
     }
 
-    const timedOut = output.includes('timed out') || output.includes('waiting for input');
+    let output = result.output ?? '';
+    // timedOut is a fact reported by the executor. It used to be sniffed out of
+    // the output text, which was wrong twice over: a command that printed
+    // something before hanging was read as success, and any command whose own
+    // output mentioned "timed out" (grepping logs, a failed curl) triggered a
+    // bogus Ctrl+C recovery into a healthy shell.
+    const timedOut = !!result.timedOut;
+    const exitCode = result.exitCode ?? null;
     const displayOutput = smartTruncate(output);
 
     setAgentSteps((prev) => prev.map((s, i) =>
@@ -303,7 +313,17 @@ const GeminiChat = forwardRef(function GeminiChat({
     };
     const functionResponseEntry = {
       role: 'user',
-      parts: [{ functionResponse: { name: 'run_command', response: { output: truncatedOutput } } }],
+      parts: [{
+        functionResponse: {
+          name: 'run_command',
+          response: {
+            output: truncatedOutput,
+            // exitCode is null when the command timed out (it never finished).
+            exitCode,
+            timedOut,
+          },
+        },
+      }],
     };
 
     return [...currentHistory, modelEntry, functionResponseEntry];
@@ -611,8 +631,9 @@ const GeminiChat = forwardRef(function GeminiChat({
 
     const maxIterations = 20;
 
+    let i = 0;
     try {
-      for (let i = 0; i < maxIterations; i++) {
+      for (; i < maxIterations; i++) {
         if (abortAgentRef.current) {
           setAgentSteps((prev) => [...prev, { type: 'aborted', status: 'done' }]);
           break;
@@ -689,6 +710,31 @@ const GeminiChat = forwardRef(function GeminiChat({
           };
           history = [...history, functionResponseEntry];
           setAgentHistory(history);
+          continue;
+        }
+
+        if (result.type === 'unknown_tool') {
+          // Feed the failure back as a tool result and keep going. Ending the
+          // run here would strand the user with "No response generated." and no
+          // way for the model to correct a name it got slightly wrong.
+          const modelEntry = { role: 'model', parts: result.parts };
+          const available = 'run_command, send_keys, read_terminal, ask_user, task_complete';
+          const functionResponseEntry = {
+            role: 'user',
+            parts: [{
+              functionResponse: {
+                name: result.name,
+                response: { error: `No tool named "${result.name}". Available tools: ${available}.` },
+              },
+            }],
+          };
+          history = [...history, modelEntry, functionResponseEntry];
+          setAgentHistory(history);
+          setAgentSteps((prev) => [...prev, {
+            type: 'error',
+            text: `Model called an unknown tool "${result.name}" — asked it to retry.`,
+            status: 'done',
+          }]);
           continue;
         }
 
@@ -774,6 +820,13 @@ const GeminiChat = forwardRef(function GeminiChat({
           history = await executeAgentSendKeys(result.keys, result.reasoning, history, result.parts);
           setAgentHistory(history);
         }
+      }
+      if (i >= maxIterations && !abortAgentRef.current) {
+        setMessages((prev) => [...prev, {
+          type: 'system',
+          text: `Agent stopped: reached the ${maxIterations}-step limit without calling task_complete. `
+            + 'The work so far is on the terminal — send another message to continue from here.',
+        }]);
       }
     } catch (err) {
       setIsLoading(false);
@@ -902,13 +955,6 @@ const GeminiChat = forwardRef(function GeminiChat({
     setInput('');
 
     if (agentMode) {
-      if (isClaudeModel(model)) {
-        setMessages((prev) => [...prev, {
-          type: 'system',
-          text: 'Agent mode runs on the Gemini tool-calling endpoint and is not available for Claude. Switch to a Gemini model, or turn agent mode off to chat with Claude.',
-        }]);
-        return;
-      }
       await startAgentLoop(fullText);
       return;
     }

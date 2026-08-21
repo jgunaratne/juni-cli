@@ -144,6 +144,40 @@ const AGENT_SYSTEM_PROMPT =
   '9. Keep individual commands short and focused. Avoid long command chains. ' +
   '10. If you need to check if a program is installed, use "which" or "command -v", not the program itself. ' +
   '11. If a run_command times out, the system auto-recovers by sending Ctrl+C. Analyze the terminal state in the response. ' +
+  '12. Every run_command response carries exitCode and timedOut alongside output. Judge success by exitCode (0 is success), ' +
+  'not by how the output reads — a command can print to stderr and still succeed, or print nothing and fail. ' +
+  'When timedOut is true the command never finished and exitCode is null; the terminal may still be occupied, so read_terminal ' +
+  'before assuming a clean prompt. ' +
   'If you cannot determine the right approach, use ask_user to request help from the user — describe what happened and ask them to resolve the terminal state or advise you on next steps. Do NOT blindly retry the same command.';
 
-module.exports = { AGENT_TOOLS, AGENT_SYSTEM_PROMPT };
+/**
+ * Lowercase every `type` in a schema. Gemini declares them uppercase
+ * ("OBJECT"/"STRING"); the Anthropic Messages API wants plain JSON Schema.
+ */
+function lowercaseSchemaTypes(value) {
+  if (!value || typeof value !== 'object') return value;
+  if (Array.isArray(value)) return value.map(lowercaseSchemaTypes);
+  const out = {};
+  for (const [key, inner] of Object.entries(value)) {
+    out[key] = key === 'type' && typeof inner === 'string' ? inner.toLowerCase() : lowercaseSchemaTypes(inner);
+  }
+  return out;
+}
+
+/**
+ * The same tools, in Anthropic Messages API shape.
+ *
+ * Derived from AGENT_TOOLS rather than written out a second time, so the two
+ * providers can never drift apart on names, arguments or descriptions.
+ */
+function toAnthropicTools() {
+  return AGENT_TOOLS.flatMap((group) => group.functionDeclarations).map((decl) => ({
+    name: decl.name,
+    description: decl.description,
+    input_schema: lowercaseSchemaTypes(decl.parameters),
+  }));
+}
+
+const AGENT_TOOL_NAMES = AGENT_TOOLS.flatMap((group) => group.functionDeclarations).map((d) => d.name);
+
+module.exports = { AGENT_TOOLS, AGENT_SYSTEM_PROMPT, toAnthropicTools, AGENT_TOOL_NAMES };
