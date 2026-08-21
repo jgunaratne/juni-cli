@@ -226,7 +226,18 @@ function createGeminiRoutes({ defaultProject, defaultLocation }) {
         // path when Gemini 3 was in preview and native calling was unreliable;
         // it is kept because it costs nothing when unused, and it is the only
         // recourse if a model stops emitting structured calls.
+        // Gemini rejects a functionCall replayed without the thoughtSignature it
+        // originally issued ("Function call is missing a thought_signature").
+        // Turns produced by the fallback below, or by Claude before a mid-run
+        // model switch, have no signature — and once one is in the history every
+        // later native call 400s, so the run silently degrades for good. Detect
+        // it up front and skip straight to the fallback instead of paying for a
+        // round trip that cannot succeed.
+        const signaturesIntact = contents.every((entry) =>
+          (entry.parts || []).every((part) => !part.functionCall || part.thoughtSignature));
+
         try {
+          if (!signaturesIntact) throw new Error('history has unsigned function calls');
           const response = await client.models.generateContent({
             model,
             contents,

@@ -152,29 +152,45 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
           return;
         }
         // A timed-out command is abandoned here but keeps running on the remote,
-        // so its sentinel arrives later — during some *later* capture. A shared
-        // sentinel would let that straggler complete the next command with the
-        // wrong output, so each command gets its own.
+        // so its markers arrive later, during some *later* capture. Shared
+        // markers would let that straggler complete the next command with the
+        // wrong output, so each command gets its own pair.
         const seq = ++agentSeqRef.current;
-        const sentinel = `${AGENT_SENTINEL}_${seq}__`;
+        const begin = `${AGENT_SENTINEL}_${seq}_B__`;
+        const end = `${AGENT_SENTINEL}_${seq}_E__`;
+
         const timer = setTimeout(() => {
           if (agentCaptureRef.current && agentCaptureRef.current.seq === seq) {
             const raw = stripAnsi(agentCaptureRef.current.buffer).trim();
             agentCaptureRef.current = null;
-            // timedOut is reported as a field, never by wording inside output:
-            // a command that times out after printing something still has a
-            // truthy buffer, and callers must not have to guess from the text.
+            // timedOut is reported as a field, never by wording inside output: a
+            // command that times out after printing something still has a
+            // truthy buffer, and callers must not guess from the text.
             resolve({ output: raw, timedOut: true, exitCode: null });
           }
         }, 20000);
-        agentCaptureRef.current = { buffer: '', resolve, timer, seq, sentinel };
-        // Prefix with PAGER=cat so git log, man, etc. don't open pagers that trap the agent.
-        // Send the command with sentinel on a NEW LINE so heredocs & multi-line
-        // commands finish before the sentinel echo runs. `:$?` carries the exit
-        // status back, which is the only reliable success/failure signal —
-        // output text alone cannot be classified.
-        const wrappedCmd = `PAGER=cat ${command}`;
-        socketRef.current.emit('ssh:data', `${wrappedCmd}\necho ${sentinel}:$?\n`);
+        agentCaptureRef.current = { buffer: '', resolve, timer, seq, begin, end };
+
+        // The output is bracketed by two markers the shell prints itself, so
+        // extraction never has to guess where output ends. Sending the command
+        // and the trailing marker as two separate lines used to leave the shell
+        // prompt and the echoed marker line inside the captured output — for a
+        // command with no output that noise *was* the output the model saw.
+        // Keeping it to one typed line puts the prompt outside the markers.
+        let payload;
+        if (command.includes('\n')) {
+          // A heredoc or loop cannot be flattened onto one line, so it travels
+          // base64-encoded. `eval` runs it in the CURRENT shell, so cd and
+          // exports still persist between agent commands — a subshell would
+          // silently discard them.
+          const encoded = btoa(unescape(encodeURIComponent(command)));
+          payload = `printf '\\n${begin}\\n'; eval "$(printf %s ${encoded} | base64 -d)"; __jrc=$?; printf '\\n${end}:%s\\n' "$__jrc"\n`;
+        } else {
+          // PAGER=cat keeps git log, man and friends from opening a pager that
+          // would trap the agent until the timeout.
+          payload = `printf '\\n${begin}\\n'; PAGER=cat ${command}; __jrc=$?; printf '\\n${end}:%s\\n' "$__jrc"\n`;
+        }
+        socketRef.current.emit('ssh:data', payload);
       });
     },
   }));
@@ -298,20 +314,22 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
       if (agentCaptureRef.current) {
         agentCaptureRef.current.buffer += data;
         const stripped = stripAnsi(agentCaptureRef.current.buffer);
-        // Anchored to a line start so the shell's echo of the command line
-        // itself ("echo __JUNI_AGENT_DONE_7__:$?") cannot end the capture.
-        const sentinelPattern = new RegExp(`[\\r\\n]${agentCaptureRef.current.sentinel}:(\\d+)`);
-        const match = sentinelPattern.exec(stripped);
+        // The closing marker carries the exit status. Requiring digits after the
+        // colon is what separates it from the shell's echo of the command line,
+        // where the same marker appears followed by an unexpanded "%s".
+        const endPattern = new RegExp(`\\n${agentCaptureRef.current.end}:(\\d+)`);
+        const match = endPattern.exec(stripped);
         if (match) {
-          const { resolve, timer } = agentCaptureRef.current;
+          const { resolve, timer, begin } = agentCaptureRef.current;
           clearTimeout(timer);
           agentCaptureRef.current = null;
-          const beforeSentinel = stripped.substring(0, match.index);
-          const firstNewline = beforeSentinel.indexOf('\n');
-          const output = firstNewline >= 0
-            ? beforeSentinel.substring(firstNewline + 1).trim()
-            : beforeSentinel.trim();
-          resolve({ output, timedOut: false, exitCode: Number(match[1]) });
+          const before = stripped.slice(0, match.index);
+          // Everything after the opening marker's own line is the command's
+          // output; the echoed command line sits before it.
+          const beginTag = `\n${begin}\n`;
+          const beginIdx = before.lastIndexOf(beginTag);
+          const output = beginIdx >= 0 ? before.slice(beginIdx + beginTag.length) : before;
+          resolve({ output: output.replace(/\s+$/, ''), timedOut: false, exitCode: Number(match[1]) });
         }
       }
     });
