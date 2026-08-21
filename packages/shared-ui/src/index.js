@@ -3,5 +3,5 @@ export { default as Terminal } from './components/Terminal.jsx';
 export { default as SharedTerminal } from './components/SharedTerminal.jsx';
 export { default as ConnectionForm } from './components/ConnectionForm.jsx';
 export { default as VncViewer } from './components/VncViewer.jsx';
-export { smartTruncate } from './utils/smartTruncate.js';
+export { smartTruncate, truncateTerminalBuffer, terminalSnapshot } from './utils/smartTruncate.js';
 

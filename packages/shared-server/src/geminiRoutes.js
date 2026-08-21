@@ -1,6 +1,6 @@
 const express = require('express');
 const { getVertexClient, getGeminiClient, getGeminiApiKeyClient, GENAI_MODELS } = require('./vertexClient');
-const { AGENT_TOOLS, AGENT_SYSTEM_PROMPT } = require('./agentTools');
+const { AGENT_TOOLS, AGENT_SYSTEM_PROMPT, buildChatSystemPrompt } = require('./agentTools');
 const { VNC_AGENT_TOOLS, VNC_AGENT_SYSTEM_PROMPT } = require('./vncAgentTools');
 
 /**
@@ -106,6 +106,7 @@ function createGeminiRoutes({ defaultProject, defaultLocation }) {
         messages = [],
         project,
         location,
+        terminalContext,
       } = req.body;
 
       if (!Array.isArray(messages) || messages.length === 0) {
@@ -132,7 +133,7 @@ function createGeminiRoutes({ defaultProject, defaultLocation }) {
             parts: [{ text: m.text }],
           })),
           config: {
-            systemInstruction: 'You are a Linux expert. Every time you mention a terminal command, you must wrap it in <cmd> and </cmd> tags. Example: Use <cmd>ls -la</cmd> to list files.',
+            systemInstruction: buildChatSystemPrompt(terminalContext),
             temperature: 0.7,
             maxOutputTokens: 4096,
           },
@@ -162,7 +163,7 @@ function createGeminiRoutes({ defaultProject, defaultLocation }) {
         const vertexAI = getVertexClient(resolvedProject, resolvedLocation);
         const generativeModel = vertexAI.getGenerativeModel({
           model,
-          systemInstruction: 'You are a Linux expert. Every time you mention a terminal command, you must wrap it in <cmd> and </cmd> tags. Example: Use <cmd>ls -la</cmd> to list files.',
+          systemInstruction: buildChatSystemPrompt(terminalContext),
           generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
         });
 

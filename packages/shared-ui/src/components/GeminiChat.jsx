@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
-import { smartTruncate } from '../utils/smartTruncate.js';
+import { smartTruncate, truncateTerminalBuffer, terminalSnapshot } from '../utils/smartTruncate.js';
 
 const CHAT_HISTORY_KEY = 'juni-cli:gemini-chat';
 const CMD_HISTORY_KEY = 'juni-cli:gemini-cmd-history';
@@ -38,12 +38,16 @@ function promptSymbol(model, agentMode) {
   return isClaudeModel(model) ? 'claude:/>' : 'gemini:/>';
 }
 
-async function callGemini(serverUrl, model, messages) {
+async function callGemini(serverUrl, model, messages, terminalContext) {
   const endpoint = isClaudeModel(model) ? 'claude' : 'gemini';
   const res = await fetch(`${serverUrl}/api/${endpoint}/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, messages }),
+    // Chat mode has no tools, so it cannot go and look at the terminal the way
+    // the agent loop can. The current buffer rides along with every turn
+    // instead — without it, "what is happening in my terminal?" is answered by
+    // a model that has never seen the terminal.
+    body: JSON.stringify({ model, messages, terminalContext: terminalContext || undefined }),
   });
 
   if (!res.ok) {
@@ -301,7 +305,7 @@ const GeminiChat = forwardRef(function GeminiChat({
       // Read terminal after recovery so the model sees the current state
       let recoveryState = '';
       if (onReadTerminal) {
-        recoveryState = '\n[Terminal state after recovery]:\n' + smartTruncate(onReadTerminal());
+        recoveryState = '\n[Terminal state after recovery]:\n' + truncateTerminalBuffer(onReadTerminal());
       }
       output += recoveryState;
     }
@@ -349,7 +353,7 @@ const GeminiChat = forwardRef(function GeminiChat({
     if (onReadTerminal) {
       const terminalContent = onReadTerminal();
       if (terminalContent) {
-        output += '\n[Full terminal buffer]:\n' + smartTruncate(terminalContent);
+        output += '\n[Full terminal buffer]:\n' + truncateTerminalBuffer(terminalContent);
       }
     }
 
@@ -747,7 +751,7 @@ const GeminiChat = forwardRef(function GeminiChat({
           if (onReadTerminal) {
             terminalContent = onReadTerminal();
           }
-          const truncatedContent = smartTruncate(terminalContent);
+          const truncatedContent = truncateTerminalBuffer(terminalContent);
 
           setAgentSteps((prev) => [...prev, {
             type: 'read_terminal',
@@ -966,7 +970,7 @@ const GeminiChat = forwardRef(function GeminiChat({
         .filter((m) => m.type === 'user' || m.type === 'model')
         .map((m) => ({ role: m.type === 'user' ? 'user' : 'model', text: m.text }));
 
-      const reply = await callGemini(serverUrl, model, apiMessages);
+      const reply = await callGemini(serverUrl, model, apiMessages, terminalSnapshot(onReadTerminal));
       setMessages((prev) => [...prev, { type: 'model', text: renderForTerminal(reply) }]);
     } catch (err) {
       setMessages((prev) => [
@@ -977,7 +981,7 @@ const GeminiChat = forwardRef(function GeminiChat({
       setIsLoading(false);
       inputRef.current?.focus();
     }
-  }, [input, isLoading, agentRunning, messages, model, agentMode, startAgentLoop, serverUrl]);
+  }, [input, isLoading, agentRunning, messages, model, agentMode, startAgentLoop, serverUrl, onReadTerminal]);
 
   useEffect(() => {
     if (autoSendRef.current && input) {

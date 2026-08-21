@@ -1,5 +1,5 @@
 const express = require('express');
-const { AGENT_SYSTEM_PROMPT, toAnthropicTools, AGENT_TOOL_NAMES } = require('./agentTools');
+const { AGENT_SYSTEM_PROMPT, buildChatSystemPrompt, toAnthropicTools, AGENT_TOOL_NAMES } = require('./agentTools');
 
 // Claude Opus 4.8. On Vertex the id carries no publisher prefix and no date
 // suffix — the bare first-party id is what the endpoint expects.
@@ -170,6 +170,7 @@ function createClaudeRoutes({ getAnthropicKey, getVertexProject, getVertexRegion
         messages = [],
         apiKey,
         effort,
+        terminalContext,
       } = req.body;
 
       if (!Array.isArray(messages) || messages.length === 0) {
@@ -193,7 +194,7 @@ function createClaudeRoutes({ getAnthropicKey, getVertexProject, getVertexRegion
       const result = await client.messages.create({
         model,
         max_tokens: 16000,
-        system: 'You are a Linux expert. Every time you mention a terminal command, you must wrap it in <cmd> and </cmd> tags. Example: Use <cmd>ls -la</cmd> to list files.',
+        system: buildChatSystemPrompt(terminalContext),
         messages: anthropicMessages,
         thinking: { type: 'adaptive' },
         output_config: { effort: effort || DEFAULT_EFFORT },
