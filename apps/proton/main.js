@@ -100,6 +100,8 @@ function startServer() {
 
     expressApp.use('/api/claude', createClaudeRoutes({
       getAnthropicKey: () => process.env.ANTHROPIC_API_KEY || '',
+      getVertexProject: () => process.env.ANTHROPIC_VERTEX_PROJECT_ID || '',
+      getVertexRegion: () => process.env.ANTHROPIC_VERTEX_REGION || '',
     }));
 
     /* ── Socket.io (SSH + Local PTY) ───────────────────── */

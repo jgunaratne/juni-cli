@@ -88,7 +88,7 @@ function renderForTerminal(text) {
 /* ── Component ────────────────────────────────────────── */
 
 const GeminiChat = forwardRef(function GeminiChat({
-  model = 'gemini-3.1-pro-preview',
+  model = 'gemini-3.7-flash',
   isActive,
   onStatusChange,
   onRunCommand,
@@ -738,7 +738,7 @@ const GeminiChat = forwardRef(function GeminiChat({
       <div className="terminal-toolbar">
         <div className="toolbar-left">
           <span className="gemini-toolbar-icon">✦</span>
-          <span className="terminal-title">gemini — Vertex AI</span>
+          <span className="terminal-title">Agent</span>
           {agentMode && <span className="agent-mode-badge">AGENT</span>}
         </div>
         <div className="toolbar-right-group">

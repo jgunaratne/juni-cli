@@ -7,9 +7,8 @@ let nextId = 1;
 const SPLIT_GEMINI_ID = '__split_gemini__';
 
 const GEMINI_MODELS = [
-  { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro' },
-  { id: 'gemini-3.1-pro-preview-customtools', label: 'Gemini 3.1 Pro (Custom Tools)' },
-  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+  { id: 'gemini-3.7-flash', label: 'Gemini 3.7 Flash' },
+  { id: 'claude-opus-4-8', label: 'Claude Opus 4.8' },
 ];
 
 const MONO_FONTS = [
@@ -91,7 +90,7 @@ function App() {
   const [splitGeminiStatus, setSplitGeminiStatus] = useState('connecting');
   const [splitFocus, setSplitFocus] = useState('left');
   const [splitRatio, setSplitRatio] = useState(50);
-  const [selectedModel, setSelectedModel] = useState('gemini-3.1-pro-preview');
+  const [selectedModel, setSelectedModel] = useState('gemini-3.7-flash');
   const [autoExecute, setAutoExecute] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [agentMode, setAgentMode] = useState(false);
@@ -657,9 +656,9 @@ function App() {
             <button
               className={`split-toggle ${splitMode ? 'split-toggle--active' : ''}`}
               onClick={toggleSplit}
-              title={splitMode ? 'Hide Gemini panel' : 'Show Gemini panel'}
+              title={splitMode ? 'Hide agent panel' : 'Show agent panel'}
             >
-              Gemini
+              Agent
             </button>
           )}
           {hasReadySSH && (
@@ -667,7 +666,7 @@ function App() {
               className="model-selector"
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
-              title="Select Gemini model"
+              title="Select model"
             >
               {GEMINI_MODELS.map((m) => (
                 <option key={m.id} value={m.id}>{m.label}</option>

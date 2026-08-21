@@ -42,7 +42,7 @@ function createGeminiRoutes({ defaultProject, defaultLocation }) {
   router.post('/chat', async (req, res) => {
     try {
       const {
-        model = 'gemini-3.1-pro-preview',
+        model = 'gemini-3.7-flash',
         messages = [],
         project,
         location,
@@ -128,7 +128,7 @@ function createGeminiRoutes({ defaultProject, defaultLocation }) {
   router.post('/agent', async (req, res) => {
     try {
       const {
-        model = 'gemini-3.1-pro-preview',
+        model = 'gemini-3.7-flash',
         history = [],
         project,
         location,
@@ -271,7 +271,7 @@ function createGeminiRoutes({ defaultProject, defaultLocation }) {
   router.post('/vnc-agent', async (req, res) => {
     try {
       const {
-        model = 'gemini-3.1-pro-preview',
+        model = 'gemini-3.7-flash',
         history = [],
         project,
         location,

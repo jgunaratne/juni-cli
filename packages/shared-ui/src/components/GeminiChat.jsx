@@ -22,8 +22,25 @@ function loadCmdHistory() {
 
 /* ── API helpers ─────────────────────────────────────── */
 
+/** Claude is served by its own route; everything else goes to Gemini. */
+function isClaudeModel(model) {
+  return typeof model === 'string' && model.startsWith('claude-');
+}
+
+/** Display name of whichever assistant is answering. */
+function assistantName(model) {
+  return isClaudeModel(model) ? 'Claude' : 'Gemini';
+}
+
+/** Prompt symbol for the active model. Agent mode has its own, model-independent. */
+function promptSymbol(model, agentMode) {
+  if (agentMode) return 'agent:/>';
+  return isClaudeModel(model) ? 'claude:/>' : 'gemini:/>';
+}
+
 async function callGemini(serverUrl, model, messages) {
-  const res = await fetch(`${serverUrl}/api/gemini/chat`, {
+  const endpoint = isClaudeModel(model) ? 'claude' : 'gemini';
+  const res = await fetch(`${serverUrl}/api/${endpoint}/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ model, messages }),
@@ -89,7 +106,7 @@ function renderForTerminal(text) {
 /* ── Component ────────────────────────────────────────── */
 
 const GeminiChat = forwardRef(function GeminiChat({
-  model = 'gemini-3.1-pro-preview',
+  model = 'gemini-3.7-flash',
   isActive,
   onStatusChange,
   onRunCommand,
@@ -856,7 +873,7 @@ const GeminiChat = forwardRef(function GeminiChat({
         {
           type: 'system', text: agentMode
             ? 'Agent mode ON — commands will be auto-executed on your terminal.'
-            : 'Type any message to chat with Gemini.'
+            : `Type any message to chat with ${assistantName(model)}.`
         },
       ]);
       setInput('');
@@ -880,11 +897,18 @@ const GeminiChat = forwardRef(function GeminiChat({
     const displayText = pastedTextRef.current ? text : undefined;
     pastedTextRef.current = null;
 
-    const userEntry = { type: 'user', text: fullText, ...(displayText && { displayText }) };
+    const userEntry = { type: 'user', text: fullText, prompt: promptSymbol(model, agentMode), ...(displayText && { displayText }) };
     setMessages((prev) => [...prev, userEntry]);
     setInput('');
 
     if (agentMode) {
+      if (isClaudeModel(model)) {
+        setMessages((prev) => [...prev, {
+          type: 'system',
+          text: 'Agent mode runs on the Gemini tool-calling endpoint and is not available for Claude. Switch to a Gemini model, or turn agent mode off to chat with Claude.',
+        }]);
+        return;
+      }
       await startAgentLoop(fullText);
       return;
     }
@@ -977,7 +1001,7 @@ const GeminiChat = forwardRef(function GeminiChat({
       <div className="terminal-toolbar">
         <div className="toolbar-left">
           <span className="gemini-toolbar-icon">✦</span>
-          <span className="terminal-title">gemini — Vertex AI</span>
+          <span className="terminal-title">Agent</span>
           {agentMode && <span className="agent-mode-badge">AGENT</span>}
         </div>
         <div className="toolbar-right-group">
@@ -1017,7 +1041,7 @@ const GeminiChat = forwardRef(function GeminiChat({
                 onClick={() => onAgentModeChange?.(!agentMode)}
                 title={agentMode ? 'Disable agent mode' : 'Enable agent mode'}
               >
-                ⚡ {agentMode ? 'Agent ON' : 'Agent'}
+                {agentMode ? 'Agent ON' : 'Agent'}
               </button>
               {agentMode && (
                 <button
@@ -1087,7 +1111,7 @@ const GeminiChat = forwardRef(function GeminiChat({
             {entry.type === 'user' && (
               <>
                 <span className="gemini-term-prompt-symbol">
-                  {agentMode ? 'agent:/>' : 'gemini:/>'}
+                  {entry.prompt ?? promptSymbol(model, agentMode)}
                 </span>
                 <span className="gemini-term-prompt-text">{entry.displayText ?? entry.text}</span>
               </>
@@ -1296,7 +1320,7 @@ const GeminiChat = forwardRef(function GeminiChat({
             onClick={() => inputRef.current?.focus()}
           >
             <span className="gemini-term-prompt-symbol">
-              {agentMode ? 'agent:/>' : 'gemini:/>'}
+              {promptSymbol(model, agentMode)}
             </span>
             <div className="gemini-term-input-wrapper">
               <input
