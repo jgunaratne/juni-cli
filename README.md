@@ -33,16 +33,16 @@ juni-cli/
 │   ├── shared-server/                    ← @juni/shared-server
 │   │   └── src/
 │   │       ├── geminiRoutes.js           ← Gemini chat + agent endpoints
-│   │       ├── claudeRoutes.js           ← Claude chat endpoint
+│   │       ├── claudeRoutes.js           ← Claude chat + agent endpoints
 │   │       ├── sshHandler.js             ← SSH socket.io handler
 │   │       ├── agentTools.js             ← Agent tool declarations + system prompt
 │   │       └── vertexClient.js           ← Vertex AI / Google AI client setup
 │   └── shared-ui/                        ← @juni/shared-ui
 │       └── src/
 │           ├── components/
-│           │   ├── GeminiChat.jsx         ← Gemini chat + agent loop
-│           │   ├── ClaudeChat.jsx         ← Claude chat
+│           │   ├── GeminiChat.jsx         ← Chat + agent loop (Gemini and Claude)
 │           │   ├── Terminal.jsx           ← xterm.js terminal
+│           │   ├── SharedTerminal.jsx     ← Read-only viewer for a shared session
 │           │   ├── ConnectionForm.jsx     ← SSH/VNC connection dialog
 │           │   └── VncViewer.jsx          ← noVNC remote desktop viewer
 │           └── utils/
@@ -90,8 +90,9 @@ npm run dev
 - **VNC remote desktop** via noVNC (WebSocket-to-TCP proxy)
 - **Local terminal** via node-pty (Proton only, for localhost connections)
 - **Terminal sharing** via WebSocket relay (host/viewer model)
-- **Gemini AI chat** with agent mode (autonomous command execution via function calling)
-- **Claude AI chat** via Anthropic API
+- **Gemini and Claude AI chat**, both with agent mode (autonomous command
+  execution via function calling)
+- **Claude via Vertex AI** (Google ADC) or an Anthropic API key
 - **Draggable split-screen** between terminal and AI chat (horizontal or vertical)
 - **Agent controls**: pause, resume, stop, retry
 - **Customizable**: font family, font size, background color, split orientation

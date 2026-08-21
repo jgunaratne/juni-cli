@@ -68,12 +68,13 @@ pm2 restart juni-cli --update-env
 - **Claude auth is Google ADC, not an Anthropic key.** `ANTHROPIC_VERTEX_PROJECT_ID`
   selects the Vertex path; no `ANTHROPIC_API_KEY` is involved. A key supplied
   per-request from Settings still overrides it.
-- **Agent mode is Gemini-only.** `/api/claude` implements `/chat` but has no
-  `/agent` or `/vnc-agent` counterpart, so `GeminiChat` blocks agent mode for
-  `claude-*` models rather than 404-ing mid-loop.
-- **`apps/*/…/src/components/*.jsx` are dead copies.** Both apps import from
-  `@juni/shared-ui`; edit `packages/shared-ui/src/components/` or the change
-  does nothing.
+- **The VNC agent is Gemini-only.** `/api/claude` implements `/chat` and
+  `/agent`, so SSH agent mode works on both providers, but there is no
+  `/api/claude/vnc-agent` — the VNC loop always posts to `/api/gemini/vnc-agent`
+  regardless of the selected model.
+- **All UI components live in `packages/shared-ui/src/components/`.** Both apps
+  import from `@juni/shared-ui` and keep no components of their own; app-level
+  copies used to exist and were deleted, so do not recreate them.
 - **A resolver can negative-cache a new hostname** for ~30 min after the DNS
   record is created, so `curl` from the box itself may fail while the site is
   fine from outside. Verify with `curl --resolve <host>:443:<edge-ip>` or from
