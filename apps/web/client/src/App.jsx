@@ -124,6 +124,11 @@ function App() {
 
   const terminalRefs = useRef({});
   const vncRefs = useRef({});
+  // The SSH tab the user worked in most recently. The agent panel is itself a
+  // tab, so once it is focused activeTab is no longer a terminal, and falling
+  // back to "the first ssh tab in the list" reads a session the user may have
+  // abandoned. This keeps the agent pointed at the terminal they mean.
+  const lastSshTabId = useRef(null);
   const splitGeminiRef = useRef(null);
   const settingsRef = useRef(null);
   const isDragging = useRef(false);
@@ -463,6 +468,7 @@ function App() {
     setTabs((prev) => [...prev, newTab]);
     setActiveTab(id);
     setShowForm(false);
+    if (tabType === 'ssh') lastSshTabId.current = id;
   }, []);
 
   const handleOpenGemini = useCallback(() => {
@@ -508,7 +514,8 @@ function App() {
   const switchTab = useCallback((tabId) => {
     setActiveTab(tabId);
     setShowForm(false);
-  }, []);
+    if (tabs.some((t) => t.id === tabId && t.type === 'ssh')) lastSshTabId.current = tabId;
+  }, [tabs]);
 
   const toggleSplit = useCallback(() => {
     setSplitMode((prev) => !prev);
@@ -534,45 +541,45 @@ function App() {
     termRef.focus();
   }, [splitMode, activeTab]);
 
+  /** The SSH tab an agent action should act on: active, else last used, else first. */
+  const resolveSshTabId = useCallback(() => {
+    if (activeTab && tabs.some((t) => t.id === activeTab && t.type === 'ssh')) return activeTab;
+    const last = lastSshTabId.current;
+    if (last && tabs.some((t) => t.id === last && t.type === 'ssh')) return last;
+    return tabs.find((t) => t.type === 'ssh')?.id;
+  }, [activeTab, tabs]);
+
   const handleRunCommand = useCallback((cmd) => {
-    const sshTabId = activeTab && tabs.find((t) => t.id === activeTab && t.type === 'ssh')
-      ? activeTab
-      : tabs.find((t) => t.type === 'ssh')?.id;
+    const sshTabId = resolveSshTabId();
     if (!sshTabId) return;
     const termRef = terminalRefs.current[sshTabId];
     if (!termRef) return;
     termRef.writeToTerminal(autoExecute ? cmd + '\n' : cmd);
     termRef.focus();
-  }, [activeTab, tabs, autoExecute]);
+  }, [resolveSshTabId, autoExecute]);
 
   const handleRunAgentCommand = useCallback(async (command) => {
-    const sshTabId = activeTab && tabs.find((t) => t.id === activeTab && t.type === 'ssh')
-      ? activeTab
-      : tabs.find((t) => t.type === 'ssh')?.id;
+    const sshTabId = resolveSshTabId();
     if (!sshTabId) return '(No SSH terminal connected)';
     const termRef = terminalRefs.current[sshTabId];
     if (!termRef) return '(Terminal ref not found)';
     return termRef.runAgentCommand(command);
-  }, [activeTab, tabs]);
+  }, [resolveSshTabId]);
 
   const handleSendAgentKeys = useCallback(async (keys) => {
-    const sshTabId = activeTab && tabs.find((t) => t.id === activeTab && t.type === 'ssh')
-      ? activeTab
-      : tabs.find((t) => t.type === 'ssh')?.id;
+    const sshTabId = resolveSshTabId();
     if (!sshTabId) return '(No SSH terminal connected)';
     const termRef = terminalRefs.current[sshTabId];
     if (!termRef) return '(Terminal ref not found)';
     return termRef.sendAgentKeys(keys);
-  }, [activeTab, tabs]);
+  }, [resolveSshTabId]);
 
   const handleAbortAgentCapture = useCallback(() => {
-    const sshTabId = activeTab && tabs.find((t) => t.id === activeTab && t.type === 'ssh')
-      ? activeTab
-      : tabs.find((t) => t.type === 'ssh')?.id;
+    const sshTabId = resolveSshTabId();
     if (!sshTabId) return;
     const termRef = terminalRefs.current[sshTabId];
     if (termRef) termRef.abortAgentCapture();
-  }, [activeTab, tabs]);
+  }, [resolveSshTabId]);
 
   const getTabLabel = (tab) => {
     if (tab.type === 'gemini') return 'Gemini';
@@ -850,7 +857,7 @@ function App() {
                   onAbortAgentCapture={handleAbortAgentCapture}
                   serverUrl={SERVER_URL}
                   onReadTerminal={() => {
-                    const sshTabId = activeTab && tabs.find((t) => t.id === activeTab && t.type === 'ssh') ? activeTab : tabs.find((t) => t.type === 'ssh')?.id;
+                    const sshTabId = resolveSshTabId();
                     if (!sshTabId) return '(No terminal connected)';
                     const termRef = terminalRefs.current[sshTabId];
                     return termRef ? termRef.getBufferText() : '(Terminal ref not found)';
@@ -936,7 +943,7 @@ function App() {
                 onAbortAgentCapture={handleAbortAgentCapture}
                 serverUrl={SERVER_URL}
                 onReadTerminal={() => {
-                  const sshTabId = activeTab && tabs.find((t) => t.id === activeTab && t.type === 'ssh') ? activeTab : tabs.find((t) => t.type === 'ssh')?.id;
+                  const sshTabId = resolveSshTabId();
                   if (!sshTabId) return '(No terminal connected)';
                   const termRef = terminalRefs.current[sshTabId];
                   return termRef ? termRef.getBufferText() : '(Terminal ref not found)';

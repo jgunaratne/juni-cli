@@ -272,7 +272,7 @@ const GeminiChat = forwardRef(function GeminiChat({
       result = typeof raw === 'string' ? { output: raw, timedOut: false, exitCode: null } : (raw || result);
     }
 
-    let output = result.output ?? '';
+    const output = result.output ?? '';
     // timedOut is a fact reported by the executor. It used to be sniffed out of
     // the output text, which was wrong twice over: a command that printed
     // something before hanging was read as success, and any command whose own
@@ -280,6 +280,7 @@ const GeminiChat = forwardRef(function GeminiChat({
     // bogus Ctrl+C recovery into a healthy shell.
     const timedOut = !!result.timedOut;
     const exitCode = result.exitCode ?? null;
+    let recoveryState = '';
     const displayOutput = smartTruncate(output);
 
     setAgentSteps((prev) => prev.map((s, i) =>
@@ -302,15 +303,19 @@ const GeminiChat = forwardRef(function GeminiChat({
         await onSendAgentKeys('q Enter');
         await new Promise((r) => setTimeout(r, 300));
       }
-      // Read terminal after recovery so the model sees the current state
-      let recoveryState = '';
+      // Read terminal after recovery so the model sees the current state.
       if (onReadTerminal) {
-        recoveryState = '\n[Terminal state after recovery]:\n' + truncateTerminalBuffer(onReadTerminal());
+        const recovered = truncateTerminalBuffer(onReadTerminal());
+        if (recovered.trim()) {
+          recoveryState = '\n[Terminal state after recovery]:\n' + recovered;
+        }
       }
-      output += recoveryState;
     }
 
-    const truncatedOutput = smartTruncate(output);
+    // Appended after truncation, for the same reason as in send_keys: the
+    // recovery snapshot is the most useful part of a timed-out turn, and
+    // truncating the concatenation is what used to cut it away.
+    const truncatedOutput = smartTruncate(output) + recoveryState;
     const modelEntry = {
       role: 'model',
       parts: originalParts,
@@ -341,31 +346,38 @@ const GeminiChat = forwardRef(function GeminiChat({
       status: 'running',
     }]);
 
-    let output = '';
+    let captured = '';
     if (onSendAgentKeys) {
-      output = await onSendAgentKeys(keys);
+      captured = await onSendAgentKeys(keys);
     } else {
-      output = '(No terminal connected for sending keys)';
+      captured = '(No terminal connected for sending keys)';
     }
 
     // Auto follow-up: read full terminal buffer after send_keys for better context.
     // send_keys only captures ~3s of output which is often insufficient.
+    //
+    // The snapshot is truncated on its own terms and appended AFTER the capture
+    // is truncated. Truncating the concatenation instead — which is what used to
+    // happen — put the whole buffer through smartTruncate's 2000-char head/tail
+    // cut, so the "full terminal buffer" the model was promised arrived as a
+    // head-weighted stub of stale scrollback.
+    let snapshot = '';
     if (onReadTerminal) {
-      const terminalContent = onReadTerminal();
-      if (terminalContent) {
-        output += '\n[Full terminal buffer]:\n' + truncateTerminalBuffer(terminalContent);
+      const terminalContent = truncateTerminalBuffer(onReadTerminal());
+      if (terminalContent.trim()) {
+        snapshot = '\n[Full terminal buffer]:\n' + terminalContent;
       }
     }
 
-    const displayOutput = smartTruncate(output);
+    const output = smartTruncate(captured) + snapshot;
 
     setAgentSteps((prev) => prev.map((s, i) =>
       i === prev.length - 1
-        ? { ...s, output: displayOutput, status: 'done' }
+        ? { ...s, output, status: 'done' }
         : s
     ));
 
-    const truncatedOutput = smartTruncate(output);
+    const truncatedOutput = output;
     const modelEntry = {
       role: 'model',
       parts: originalParts,
@@ -751,12 +763,17 @@ const GeminiChat = forwardRef(function GeminiChat({
           if (onReadTerminal) {
             terminalContent = onReadTerminal();
           }
-          const truncatedContent = truncateTerminalBuffer(terminalContent);
+          // An empty result is a real answer ("the terminal is up but nothing
+          // has been printed"), and it is also what a broken read looks like.
+          // Saying so in words beats handing the model '' and letting it
+          // improvise: whatever it then reports, the user can act on.
+          const truncatedContent = truncateTerminalBuffer(terminalContent).trim()
+            || '(The terminal buffer is empty — the terminal is connected but nothing has been printed to it.)';
 
           setAgentSteps((prev) => [...prev, {
             type: 'read_terminal',
             reasoning: result.reasoning,
-            output: smartTruncate(terminalContent),
+            output: truncateTerminalBuffer(terminalContent) || '(empty buffer)',
             status: 'done',
           }]);
 

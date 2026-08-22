@@ -37,7 +37,12 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
     focus: () => xtermRef.current?.focus(),
     getBufferText: () => {
       const term = xtermRef.current;
-      if (!term) return '';
+      // A parenthesised sentinel, not '': an empty string is indistinguishable
+      // from a genuinely blank buffer, and that ambiguity is exactly what makes
+      // the agent report "nothing in the terminal" when the real answer is
+      // "this component never finished mounting". terminalSnapshot() collapses
+      // sentinels to '' for chat, so nothing leaks into ambient context.
+      if (!term) return '(Terminal not initialized)';
       const buf = term.buffer.active;
       const lines = [];
       for (let i = 0; i < buf.length; i++) {
@@ -522,8 +527,8 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
             )}
           </div>
           {onSendToGemini && (
-            <button className="disconnect-btn send-to-gemini-btn" onClick={onSendToGemini} title="Copy terminal output to Gemini input">
-              → Gemini
+            <button className="disconnect-btn send-to-gemini-btn" onClick={onSendToGemini} title="Copy terminal output to the Agent input">
+              → Agent
             </button>
           )}
           <button className="disconnect-btn" onClick={onClose}>
