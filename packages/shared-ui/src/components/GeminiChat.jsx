@@ -108,6 +108,14 @@ function renderForTerminal(text) {
     .replace(/^# (.+)$/gm, '  $1');
 }
 
+/** "12s" for a step that is still going, so a long command reads as working
+ *  rather than frozen. Blank under a second, where a counter is just noise. */
+function elapsedLabel(startedAt) {
+  if (!startedAt) return '';
+  const seconds = Math.floor((Date.now() - startedAt) / 1000);
+  return seconds >= 1 ? ` ${seconds}s` : '';
+}
+
 /* ── Component ────────────────────────────────────────── */
 
 const GeminiChat = forwardRef(function GeminiChat({
@@ -173,6 +181,16 @@ const GeminiChat = forwardRef(function GeminiChat({
   useEffect(() => {
     onStatusChange('ready');
   }, [onStatusChange]);
+
+  // Drives the elapsed counter on a running step. Nothing else re-renders the
+  // panel while a command is out, so without this a two-minute build and a
+  // wedged shell look exactly alike.
+  const [, setElapsedTick] = useState(0);
+  useEffect(() => {
+    if (!agentRunning) return undefined;
+    const id = setInterval(() => setElapsedTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [agentRunning]);
 
   useEffect(() => {
     localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(messages));
@@ -263,6 +281,7 @@ const GeminiChat = forwardRef(function GeminiChat({
       command,
       reasoning,
       status: 'running',
+      startedAt: Date.now(),
     }]);
 
     let result = { output: '(No terminal connected for agent execution)', timedOut: false, exitCode: null };
@@ -293,7 +312,7 @@ const GeminiChat = forwardRef(function GeminiChat({
       // Auto-recover: try to escape whatever is stuck
       setMessages((prev) => [...prev, {
         type: 'system',
-        text: 'Command timed out — auto-recovering (sending Ctrl+C, exiting pagers)…',
+        text: 'Command produced no output for a minute — assuming it is stuck and auto-recovering (sending Ctrl+C, exiting pagers)…',
       }]);
       if (onSendAgentKeys) {
         await onSendAgentKeys('Ctrl+C');
@@ -1222,7 +1241,7 @@ const GeminiChat = forwardRef(function GeminiChat({
             {step.type === 'command' && (
               <>
                 <div className="agent-step-header">
-                  [{step.status === 'running' ? 'running' : step.status === 'timeout' ? 'timeout' : step.status === 'skipped' ? 'skipped' : 'done'}] {step.reasoning}
+                  [{step.status === 'running' ? `running${elapsedLabel(step.startedAt)}` : step.status === 'timeout' ? 'timeout' : step.status === 'skipped' ? 'skipped' : 'done'}] {step.reasoning}
                 </div>
                 <div className="agent-step-command">
                   {'> '}{step.command}

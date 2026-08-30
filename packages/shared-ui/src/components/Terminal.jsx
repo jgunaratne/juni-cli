@@ -8,6 +8,13 @@ import '@xterm/xterm/css/xterm.css';
 // Base marker; each command appends its own sequence number and a closing __.
 const AGENT_SENTINEL = '__JUNI_AGENT_DONE';
 
+// A command is declared hung only after it has gone completely SILENT for this
+// long — not after a fixed budget from when it started. Anything that is still
+// printing is still working, however long it takes.
+const AGENT_IDLE_TIMEOUT_MS = 60000;
+// Absolute ceiling, so a command that dribbles output forever still returns.
+const AGENT_MAX_RUNTIME_MS = 15 * 60 * 1000;
+
 const stripAnsi = (str) => str
   .replace(/\x1b\[[\?=>!]?[0-9;]*[a-zA-Z]/g, '')
   .replace(/\x9b[0-9;]*[a-zA-Z]/g, '')
@@ -164,17 +171,47 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
         const begin = `${AGENT_SENTINEL}_${seq}_B__`;
         const end = `${AGENT_SENTINEL}_${seq}_E__`;
 
-        const timer = setTimeout(() => {
-          if (agentCaptureRef.current && agentCaptureRef.current.seq === seq) {
-            const raw = stripAnsi(agentCaptureRef.current.buffer).trim();
-            agentCaptureRef.current = null;
-            // timedOut is reported as a field, never by wording inside output: a
-            // command that times out after printing something still has a
-            // truthy buffer, and callers must not guess from the text.
-            resolve({ output: raw, timedOut: true, exitCode: null });
+        // The watchdog measures silence, not elapsed time. A flat 20s budget
+        // from the start declared every honest long job — a build, an install,
+        // a clone — hung while it was still printing: the panel sat on
+        // [running] with nothing to show, then the timeout fired Ctrl+C into a
+        // healthy command that carried on to completion on the terminal. That
+        // is the split the user sees, the terminal finishing while the agent
+        // stays stuck: the abandoned command still owns the shell, so the next
+        // command's payload waits in the tty and its capture times out too.
+        const startedAt = Date.now();
+        const giveUp = () => {
+          if (!agentCaptureRef.current || agentCaptureRef.current.seq !== seq) return;
+          const raw = stripAnsi(agentCaptureRef.current.buffer).trim();
+          agentCaptureRef.current = null;
+          // timedOut is reported as a field, never by wording inside output: a
+          // command that times out after printing something still has a
+          // truthy buffer, and callers must not guess from the text.
+          resolve({ output: raw, timedOut: true, exitCode: null });
+        };
+        // Called on every chunk of output: as long as something is arriving,
+        // the silence window starts over, bounded by the hard ceiling.
+        const armIdleTimer = () => {
+          const capture = agentCaptureRef.current;
+          if (!capture || capture.seq !== seq) return;
+          clearTimeout(capture.timer);
+          const remaining = AGENT_MAX_RUNTIME_MS - (Date.now() - startedAt);
+          if (remaining <= 0) {
+            giveUp();
+            return;
           }
-        }, 20000);
-        agentCaptureRef.current = { buffer: '', resolve, timer, seq, begin, end };
+          capture.timer = setTimeout(giveUp, Math.min(AGENT_IDLE_TIMEOUT_MS, remaining));
+        };
+
+        agentCaptureRef.current = {
+          buffer: '',
+          resolve,
+          timer: setTimeout(giveUp, AGENT_IDLE_TIMEOUT_MS),
+          seq,
+          begin,
+          end,
+          armIdleTimer,
+        };
 
         // The output is bracketed by two markers the shell prints itself, so
         // extraction never has to guess where output ends. Sending the command
@@ -335,6 +372,8 @@ const Terminal = forwardRef(function Terminal({ tabId, connection, isActive, onS
           const beginIdx = before.lastIndexOf(beginTag);
           const output = beginIdx >= 0 ? before.slice(beginIdx + beginTag.length) : before;
           resolve({ output: output.replace(/\s+$/, ''), timedOut: false, exitCode: Number(match[1]) });
+        } else {
+          agentCaptureRef.current.armIdleTimer();
         }
       }
     });
