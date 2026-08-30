@@ -957,7 +957,7 @@ const GeminiChat = forwardRef(function GeminiChat({
     if (text === 'model') {
       setMessages((prev) => [
         ...prev,
-        { type: 'system', text: `Model: ${model} (via Vertex AI)` },
+        { type: 'system', text: `Model: ${model}` },
         { type: 'system', text: `Agent mode: ${agentMode ? 'ON' : 'OFF'}` },
       ]);
       setInput('');
@@ -1160,7 +1160,7 @@ const GeminiChat = forwardRef(function GeminiChat({
         {messages.length === 0 && agentSteps.length === 0 && !isLoading && (
           <div className="gemini-term-welcome">
             <div className="gemini-term-info">
-              <span className="gemini-term-label">{model}</span> via Vertex AI
+              <span className="gemini-term-label">{model}</span>
               {agentMode && <span className="agent-welcome-badge">Agent Mode</span>}
             </div>
             <div className="gemini-term-hint">
